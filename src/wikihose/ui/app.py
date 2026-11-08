@@ -27,6 +27,7 @@ from wikihose.catchup import CatchUpResult, catch_up
 from wikihose.clock import Clock
 from wikihose.config import Config, load_config, save_config
 from wikihose.net import Client
+from wikihose.reading import ReadingSource
 from wikihose.sources.events import Edit, FeedStatus, PageMove, StreamItem
 from wikihose.sources.protocol import DataSource
 from wikihose.sources.replay import ReplaySource
@@ -36,10 +37,10 @@ from wikihose.trend import Trends
 from wikihose.ui.bars import HealthBar, TopBar
 from wikihose.ui.bindings import declared_bindings, help_text, key_label
 from wikihose.ui.dialogs import FIXED_HELP, AddPage, HelpScreen
+from wikihose.ui.tabs.convergence import ConvergenceTab
 from wikihose.ui.tabs.diff import DiffTab, OpenDiff
 from wikihose.ui.tabs.live import LiveTab
 from wikihose.ui.tabs.reading import Factory, ReadingTab
-from wikihose.ui.tabs.stub import STUBS, StubPane
 from wikihose.ui.tabs.watchlist import WatchlistTab
 from wikihose.ui.theme import THEMES
 from wikihose.ui.widgets import PageTable
@@ -97,7 +98,7 @@ class MainScreen(Screen[None]):
             with TabPane("Diff", id="diff"):
                 yield DiffTab(shell.client, shell.watchlist, shell.tz)
             with TabPane("Convergence", id="convergence"):
-                yield StubPane(STUBS["convergence"][1])
+                yield ConvergenceTab(shell.wiki, shell.clock, shell.subscribe, self.reading_source)
         yield HealthBar()
         yield Footer(show_command_palette=False, compact=True)
         yield TooSmall()
@@ -160,11 +161,23 @@ class MainScreen(Screen[None]):
         self.query_one(TopBar).refresh_text()
 
     def start_over(self) -> None:
-        """A looping replay began again: the Live tab's numbers start from zero."""
+        """A looping replay began again: the Live and Convergence tabs' numbers start from zero."""
         self.query_one(LiveTab).start_over()  # not the app's query_one: a dialog may be the active screen
+        self.query_one(ConvergenceTab).start_over()
 
     def set_reading_wiki(self, wiki: str) -> None:
         self.query_one(ReadingTab).set_wiki(wiki)
+        self.query_one(ConvergenceTab).set_wiki(wiki)
+
+    def reading_source(self) -> ReadingSource | None:
+        """The Reading tab's data, which the Convergence tab shares (one cache, one request budget)."""
+        return self.query_one(ReadingTab).source
+
+    def on_reading_tab_loaded(self, message: ReadingTab.Loaded) -> None:
+        self.query_one(ConvergenceTab).set_reading(message.wiki, message.rows, message.error)
+
+    def on_convergence_tab_needs_reading(self, message: ConvergenceTab.NeedsReading) -> None:
+        self.query_one(ReadingTab).start()
 
 
 class WikihoseApp(App[None]):
