@@ -26,6 +26,7 @@ class ReplaySource:
 
     def __init__(self, path: Path, clock: Clock, *, speed: float = 1.0) -> None:
         self.clock = clock
+        self._path = path
         self._header, self._events = read_recording(path)
         self.recorded_start: datetime = self._header.recorded_at
         self._elapsed = 0.0  # recorded seconds played so far
@@ -61,6 +62,13 @@ class ReplaySource:
         """Jump forward in recorded time. Events in the skipped span are still yielded, without waiting."""
         if seconds > 0:
             self._elapsed += seconds
+
+    def rewind(self) -> None:
+        """Start the recording over from the top; call it after ``items()`` has finished, then iterate it again."""
+        self._events.close()
+        self._header, self._events = read_recording(self._path)
+        self._elapsed = 0.0
+        self._closed = False
 
     def moment(self) -> datetime:
         """The recorded time the replay has reached."""

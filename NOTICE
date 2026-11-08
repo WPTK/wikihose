@@ -1,6 +1,7 @@
 wikihose source code is released under the MIT License (see LICENSE).
 
-The files under tests/fixtures/ and any bundled or recorded demo data contain content from Wikimedia projects
+The files under tests/fixtures/ and any bundled or recorded demo data (including
+src/wikihose/data/sample.jsonl.gz and src/wikihose/data/demo-enwiki.jsonl.gz) contain content from Wikimedia projects
 (page titles, edit summaries, article summaries, pageview counts and diffs). That content is available under the
 Creative Commons Attribution-ShareAlike 4.0 International license (CC BY-SA 4.0,
 https://creativecommons.org/licenses/by-sa/4.0/). Authorship is recorded in each page's history on the originating wiki.

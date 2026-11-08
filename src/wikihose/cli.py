@@ -15,6 +15,8 @@ from wikihose.clock import SystemClock
 from wikihose.config import WIKI_PATTERN, Config, default_config_path, load_config
 from wikihose.paths import db_path, log_dir
 
+DEMO_WIKI = "enwiki"
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -29,9 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-config", action="store_true", help="ignore the config file and use the defaults")
     parser.add_argument("--debug", action="store_true", help="write debug logging to the log file")
     parser.add_argument("--wiki", metavar="NAME", help="the wiki to watch this time, such as enwiki or dewiki")
-    parser.add_argument("--replay", metavar="FILE", type=Path, help="play back a recording instead of going live")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--demo", action="store_true", help="play the bundled six-minute recording of English Wikipedia; no network"
+    )
+    source.add_argument("--replay", metavar="FILE", type=Path, help="play back a recording instead of going live")
     parser.add_argument("--speed", metavar="N", type=float, help="replay speed, 0.5 to 16 (default 1)")
-    parser.add_argument(
+    source.add_argument(
         "--record",
         metavar="FILE",
         type=Path,
@@ -70,8 +76,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_selftest()
     if args.wiki is not None and not WIKI_PATTERN.match(args.wiki):
         parser.error(f"--wiki {args.wiki!r} is not a wiki name; use something like enwiki or dewiki")
-    if args.replay is not None and args.record is not None:
-        parser.error("--replay and --record cannot be used together")
+    if args.demo and args.wiki is not None:
+        parser.error("--wiki cannot be used with --demo; the demo is English Wikipedia (enwiki)")
     if args.speed is not None and args.replay is None:
         parser.error("--speed only applies to --replay")
     if args.force and args.record is None:
@@ -85,6 +91,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(warning, file=sys.stderr)
     if args.wiki is not None:
         config = replace(config, wiki=args.wiki)
+    if args.demo:
+        config = replace(config, wiki=DEMO_WIKI)
+        config_path = None  # the demo never writes the config
     return asyncio.run(run(args, config, config_path))
 
 
@@ -93,13 +102,18 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
     from wikihose.net import Client, RequestBudget
     from wikihose.sources.live import LiveSource
     from wikihose.sources.protocol import DataSource
-    from wikihose.sources.recording import Recorder, RecordingError
+    from wikihose.sources.recording import Recorder, RecordingError, demo_recording
     from wikihose.sources.replay import ReplaySource
 
     clock = SystemClock()
     client: Client | None = None
     source: DataSource
-    if args.replay is not None:
+    if args.demo:
+        with demo_recording() as demo_path:
+            source = ReplaySource(
+                demo_path, clock
+            )  # a real file in an installed package, so the path stays good for rewinds
+    elif args.replay is not None:
         try:
             source = ReplaySource(args.replay, clock, speed=args.speed or 1.0)
         except (RecordingError, OSError) as exc:
@@ -118,9 +132,10 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
         from wikihose.store import Store
         from wikihose.ui.app import WikihoseApp
 
-        store = Store(db_path()) if args.replay is None else None  # a replay must not add old edits to the database
+        replaying = args.replay is not None or args.demo
+        store = None if replaying else Store(db_path())  # a replay must not add old edits to the database
         try:
-            app = WikihoseApp(source, config, clock=clock, store=store, config_path=config_path)
+            app = WikihoseApp(source, config, clock=clock, store=store, config_path=config_path, loop_replay=args.demo)
             await app.run_async()
         finally:
             if store is not None:

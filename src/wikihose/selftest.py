@@ -16,7 +16,7 @@ from wikihose.clock import VirtualClock
 from wikihose.config import Config, load_config, save_config
 from wikihose.net import RequestBudget
 from wikihose.sources.events import Edit, FeedStatus, PageMove, parse_recentchange
-from wikihose.sources.recording import read_recording, sample_recording
+from wikihose.sources.recording import demo_recording, read_recording, sample_recording
 from wikihose.sources.replay import ReplaySource
 from wikihose.store import SCHEMA_VERSION, Store
 from wikihose.ui.theme import THEMES, orange_roles
@@ -62,6 +62,13 @@ def _parse() -> None:
     assert edits > 0 and moves > 0, f"the sample parsed to {edits} edits and {moves} moves"
 
 
+def _demo() -> None:
+    with demo_recording() as path:
+        header, events = read_recording(path)
+        count = sum(1 for _ in events)
+    assert header.wiki == "enwiki" and count > 1000, f"the demo recording is {header.wiki} with {count} events"
+
+
 def _replay() -> None:
     edits, moves = _sample_counts()
 
@@ -104,6 +111,7 @@ CHECKS: list[tuple[str, Callable[[], None]]] = [
     ("database migrates to version 1", _store),
     ("sample events parse", _parse),
     ("replay of the sample", _replay),
+    ("demo recording is there", _demo),
     ("request budget admits 150, then waits", _budget),
 ]
 
