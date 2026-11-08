@@ -98,8 +98,14 @@ jobs:
       - name: Collect the files and write SHA256SUMS
         run: |
           mkdir release
-          cp parts/dist/* parts/exe/* release/
+          cp parts/dist/* parts/binary-*/* release/
           cd release
+          # A renamed or dropped matrix entry must stop the release here, before PyPI can take the version.
+          version=${GITHUB_REF_NAME#v}
+          for f in "wikihose-$version-py3-none-any.whl" "wikihose-$version.tar.gz" "wikihose-$version-windows-x86_64.exe" "wikihose-$version-linux-x86_64.tar.gz" "wikihose-$version-linux-arm64.tar.gz" "wikihose-$version-macos-arm64.tar.gz" "wikihose-$version-macos-x86_64.tar.gz"; do
+            [ -f "$f" ] || { echo "::error::missing $f"; exit 1; }
+          done
+          [ "$(ls | wc -l)" -eq 7 ] || { echo "::error::expected exactly 7 files"; ls; exit 1; }
           sha256sum -- * > SHA256SUMS
           cat SHA256SUMS
       - name: Confirm the tag still points at the commit that was built
