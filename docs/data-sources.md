@@ -99,8 +99,35 @@ What the app does:
 
 ## Reading baselines
 
-1,000 per-article calls at 200 a minute take 5 minutes, every day. Suggested approach, to be tested in Session 2:
+1,000 per-article calls at 200 a minute take 5 minutes, every day, so the app bounds baselines cheaply first and fetches
+exact history only for a short list. Tested on 7 Nov 2026 against enwiki: 31 daily top lists (3 seconds apart) and exact
+`agent=user` history for the 12 highest candidates.
 
-1. Bound each baseline from the last 30 daily top lists (30 requests). An article missing from a day's list had fewer
-   views than that day's rank-1,000 count.
-2. Fetch exact history only for the top candidates, within the budget, and cache it in SQLite.
+1. Take the last 30 daily top lists (30 requests, cached; past days never change, so after the first run only the newest
+   day is new). An article missing from a day's list had fewer views than that day's rank-1,000 count, which ranged from
+   7,390 to 10,002 over the month. Treat a missing day as "at most that floor".
+2. Score every article in today's list with a bounded baseline: the median of its listed days, with missing days counted
+   at the floor itself, so the baseline is never below the truth and the score is a lower bound. 
+   Rank by today divided by that baseline.
+3. Fetch exact history for the top 50 candidates (50 requests, about a quarter of one minute's budget) and replace the
+   bound with the true 30-day median. Cache the series in SQLite; yesterday's value is final, so later runs fetch only
+   the new days.
+
+What the test showed:
+
+- Only 152 of 1,000 articles appear on all 30 daily lists. The rest are missing on some days, and the ones that spike are
+  mostly missing on nearly all of them (Stephen Miller: 26 of 30 days missing).
+- The bound is a **lower bound** on the spike. Where an article is listed on most days the estimate is within 2% of the
+  true median (Russell Brand 12,909 vs 13,175; Ramayana: Part 1 32,740 vs 32,193). Where it is missing, the true median
+  is far below the floor: Michael Locke 32 (test estimate 3,876), Kimmarie Johnson 9 (3,876), Joe Fagnano 279 (3,906). The
+  test counted a missing day at half the floor; the app counts it at the full floor, which makes the baseline an upper
+  bound and the score a true lower bound (half the floor could rank a ~7,000-view page too high). Step 3 shows the real
+  number.
+- All 12 top candidates had `today` in the top list equal to the exact `agent=user` figure, so the top list can be used
+  as today's value.
+- **Per-article history leaves out days with no data.** Two of the 12 returned 31 items for a 32-day window. Align the
+  series by `timestamp`, never by position, and fill missing days with zero.
+- Per-article history for a 30-day window returned 29 to 30 items for a steady article (the newest day can be absent).
+
+Spike (owner's choice, 7 Nov 2026): today's views divided by the 30-day median, shown only for pages with at least 5,000
+views today. The Reading tab shows 25 rows by default.
