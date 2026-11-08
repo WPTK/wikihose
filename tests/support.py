@@ -102,35 +102,23 @@ async def wait_for_stream(app: WikihoseApp, pilot: Any) -> None:
 
 
 async def footer_keys(pilot: Any, app: WikihoseApp, *, needing: str | None = None) -> list[Any]:
-    """The footer's key widgets once they exist (and, with ``needing``, one whose label contains it).
+    """The footer's key widgets once its rebuild is done (and, with ``needing``, one whose label contains it).
 
-    The footer rebuilds its keys asynchronously after bindings change, so a single ``pilot.pause()`` can be too early on
-    a slow machine. This yields to the event loop until they are there, without any wall-clock wait.
-    """
-    for _ in range(50):
-        keys = list(app.query("FooterKey"))
-        if keys and (needing is None or any(needing in str(k.render()) for k in keys)):
-            return keys
-        await pilot.pause()
-    seen = [str(k.render()) for k in app.query("FooterKey")]
-    raise AssertionError(f"the footer never showed a key containing {needing!r}; it shows {seen}")
-
-
-async def settled_footer_keys(pilot: Any, app: WikihoseApp) -> list[Any]:
-    """The footer's keys once the rebuild after a tab change is done: every key laid out and the same set twice running.
-
-    Right after a tab change the old tab's keys can still be there with no width, so a label every tab shows (Quit) is
-    not enough to know the new footer is in.
+    The footer rebuilds its keys asynchronously after the bindings change (a tab change, a dialog closing). Until then
+    the old keys can still be there with no width yet, so a click on one misses and a label every tab shows (Quit) says
+    nothing about which footer it is. The footer counts as done when every key is laid out and the same set shows twice
+    running. This yields to the event loop until then, without any wall-clock wait.
     """
     previous: list[str] = []
     for _ in range(100):
         await pilot.pause()
         keys = list(app.query("FooterKey"))
         labels = [str(k.render()) for k in keys]
-        if keys and all(k.region.width > 0 for k in keys) and labels == previous:
+        settled = keys and all(k.region.width > 0 for k in keys) and labels == previous
+        if settled and (needing is None or any(needing in label for label in labels)):
             return keys
         previous = labels
-    raise AssertionError(f"the footer never settled; it shows {previous}")
+    raise AssertionError(f"the footer never settled with a key containing {needing!r}; it shows {previous}")
 
 
 def footer_text(keys: list[Any]) -> str:

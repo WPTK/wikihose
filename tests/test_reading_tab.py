@@ -265,11 +265,14 @@ async def test_footer_keys_refresh_and_rows_work_when_clicked(clock: VirtualCloc
     async with app.run_test(size=(140, 30)) as pilot:
         await pilot.press("2")
         await settle_reading(app, pilot)
-        for label in ("Refresh", "Rows"):
-            keys = await footer_keys(pilot, app, needing=label)
-            await pilot.click(next(k for k in keys if label in str(k.render())))
-            await pilot.pause()
-        assert fake.loads == 2 and table(app).row_count == 50
+        keys = await footer_keys(pilot, app, needing="Refresh")
+        await pilot.click(next(k for k in keys if "Refresh" in str(k.render())))
+        await settle_reading(app, pilot)  # the reload runs in a worker
+        assert fake.loads == 2
+        keys = await footer_keys(pilot, app, needing="Rows")
+        await pilot.click(next(k for k in keys if "Rows" in str(k.render())))
+        await pilot.pause()
+        assert table(app).row_count == 50
 
 
 async def test_help_on_the_reading_tab_lists_its_keys(clock: VirtualClock) -> None:
