@@ -464,11 +464,12 @@ class LiveTab(Vertical):
         self._draw_filters()
 
     def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
-        # the demo recording is English Wikipedia only
-        return not (action == "change_wiki" and getattr(self.app, "loop_replay", False))
+        # A replay picks its wiki at the start: the one a --record recording holds (it saves only that wiki's edits), or
+        # --wiki for a recording of every wiki. Keeping i out of a replay also keeps its footer inside 80 columns.
+        return not (action == "change_wiki" and getattr(self.app, "replaying", False))
 
     def action_change_wiki(self) -> None:
-        if getattr(self.app, "loop_replay", False):
+        if getattr(self.app, "replaying", False):
             return
         self.app.push_screen(WikiPrompt(), self.set_wiki)
 

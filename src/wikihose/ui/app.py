@@ -378,7 +378,7 @@ class WikihoseApp(App[None]):
 
     def start_catch_up(self) -> None:
         """Check the watched pages in the background. Not in a replay, which has no network."""
-        if self.client is None or isinstance(self.source, ReplaySource) or not len(self.watchlist):
+        if self.client is None or self.replaying or not len(self.watchlist):
             return
         self.run_worker(self._catch_up(self.client), name="catch-up", group="catch-up", exclusive=True)
 
@@ -490,9 +490,14 @@ class WikihoseApp(App[None]):
 
     # --- replay keys -------------------------------------------------------------------------------------------------
 
+    @property
+    def replaying(self) -> bool:
+        """Whether the source is a recording (``--replay`` or ``--demo``) rather than the live stream."""
+        return isinstance(self.source, ReplaySource)
+
     def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
         if action.startswith("replay_"):
-            return isinstance(self.source, ReplaySource)
+            return self.replaying
         return True
 
     def replay_state(self) -> str:

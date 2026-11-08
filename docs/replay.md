@@ -15,6 +15,8 @@ A gzipped UTF-8 JSONL file. The first line is the header:
 - `recorded_at` is the UTC time the recording started. A replay reports `recorded_at` plus the time played so far as its
   current moment.
 - `wiki` is a wiki database name such as `enwiki` when the recording was filtered to one wiki, otherwise `all`.
+  `--record` always filters to the selected wiki. `--replay` plays a one-wiki recording in that wiki; for `all`
+  it uses `--wiki` or the configured wiki. The wiki cannot be changed during a replay.
 
 Every later line is one server-sent event:
 

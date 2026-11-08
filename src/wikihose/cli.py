@@ -43,7 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
     source.add_argument(
         "--demo", action="store_true", help="play the bundled six-minute recording of English Wikipedia; no network"
     )
-    source.add_argument("--replay", metavar="FILE", type=Path, help="play back a recording instead of going live")
+    source.add_argument(
+        "--replay",
+        metavar="FILE",
+        type=Path,
+        help="play back a recording instead of going live, in the wiki it was recorded from "
+        "(--wiki picks one for a recording of every wiki)",
+    )
     parser.add_argument("--speed", metavar="N", type=float, help="replay speed, 0.5 to 16 (default 1)")
     source.add_argument(
         "--record",
@@ -161,6 +167,8 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
         except (RecordingError, OSError) as exc:
             print(f"wikihose: {exc}", file=sys.stderr)
             return 1
+        if args.wiki is None and not args.demo and is_valid_wiki(source.wiki):
+            config = replace(config, wiki=source.wiki)  # play a one-wiki recording in its own wiki; "all" keeps config
     else:
         client = Client(clock, RequestBudget(clock), config.contact)
         recorder = Recorder(args.record, clock, wiki=config.wiki) if args.record is not None else None

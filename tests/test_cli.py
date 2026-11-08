@@ -6,6 +6,7 @@ import pytest
 
 from wikihose import __version__
 from wikihose.cli import main
+from wikihose.clock import VirtualClock
 
 
 def quick(sample: Path) -> list[str]:
@@ -138,3 +139,41 @@ async def test_headless_run_counts_the_sample_on_a_virtual_clock(clock, sample_p
     summary = await run_headless(ReplaySource(sample_path, clock), "enwiki", 1000)
     assert summary.startswith("edits=")
     assert "edits_per_min=" in summary
+
+
+@pytest.mark.parametrize(
+    ("recorded", "args", "expected"),
+    [
+        ("dewiki", [], "dewiki"),
+        ("dewiki", ["--wiki", "frwiki"], "frwiki"),
+        (None, [], "enwiki"),
+        (None, ["--wiki", "frwiki"], "frwiki"),
+    ],
+)
+def test_a_replay_plays_in_the_wiki_its_recording_holds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    clock: VirtualClock,
+    recorded: str | None,
+    args: list[str],
+    expected: str,
+) -> None:
+    from wikihose.sources.recording import Recorder
+
+    path = tmp_path / "rec.jsonl.gz"
+    Recorder(path, clock, wiki=recorded).close()
+    seen: dict[str, str] = {}
+
+    class FakeApp:
+        def __init__(self, source: object, config: object, **kwargs: object) -> None:
+            seen["wiki"] = config.wiki  # type: ignore[attr-defined]
+
+        async def run_async(self) -> None:
+            return None
+
+    import wikihose.ui.app
+
+    monkeypatch.setattr(wikihose.ui.app, "WikihoseApp", FakeApp)
+    monkeypatch.setattr("wikihose.cli._saved_watchlist", lambda: [])
+    assert main(["--replay", str(path), "--no-config", *args]) == 0
+    assert seen["wiki"] == expected

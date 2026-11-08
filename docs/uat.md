@@ -121,7 +121,7 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
   or minus, and color).
 - L3. At 80 columns the right column shows the sparkline, the people/bots split and the top articles of the last 15
   minutes. The editor column appears from about 105 columns and the summary from about 145.
-- L4. Each filter key toggles its filter and the filter line shows its state: `i` wiki, `b` bots, `a` articles only,
+- L4. Each filter key toggles its filter and the filter line shows its state: `i` wiki (live only; off in a replay), `b` bots, `a` articles only,
   `m` minimum size. (auto for `a` and `b`)
 - L5. Select a row (arrow keys, then click): `w` adds the article to the Watchlist; Enter opens the edit's detail with
   a link; `d` opens its diff.
@@ -168,7 +168,7 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 
 | Date | Build (commit, exe SHA-256) | Tester | P0 open | P1 open | P2 open | P3 open | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch at `175ae87`, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 1 | 3 | Pass for the automated part |
+| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch at `175ae87`, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 0 | 3 | Pass for the automated part |
 
 Findings from that run, and where each went:
 
@@ -180,7 +180,7 @@ Findings from that run, and where each went:
 | A page with a usual of 0 tops the Reading ranking with a five-digit spike | P3 | #26 |
 | Live log rows are in arrival order, not time order | P3 | #27 |
 | Reading at 240 columns spreads its numbers far from the titles; a blank cell in one sparkline | P3 | #28 |
-| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns, so `] Skip` cannot be seen or clicked | P2 | #29, named in the release notes' known-issues notice |
+| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns, so `] Skip` cannot be seen or clicked | P2 | Fixed for #29: `i` is off in every replay, which plays in the wiki its recording holds (`--wiki` picks one for a recording of every wiki); `test_the_footer_fits_80_columns_on_every_tab[replay]` |
 
 No orange anywhere in the captures (the one orange-range value is the window-frame dot the SVG export draws). Every
 tab fits 80x24 and 240x60 with nothing cut sideways, and Reading and Convergence show the demo's recorded day.

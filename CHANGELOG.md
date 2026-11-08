@@ -5,7 +5,7 @@ entry. Versions follow [ZeroVer](https://0ver.org).
 
 ## [0.1.0] - Unreleased
 
-_Known issues: in a plain `--replay` at 80 columns the Live footer is cut off before `] Skip`, and `?` lists every key (#29); the Live log can show rows slightly out of time order, as the feed sends them (#27)._
+_Known issue: the Live log can show rows slightly out of time order, as the feed sends them (#27)._
 
 ### Added
 

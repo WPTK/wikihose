@@ -243,7 +243,7 @@ async def test_help_lists_the_replay_keys_only_in_a_replay(clock: VirtualClock) 
             await pilot.press("question_mark")
             await pilot.pause()
             assert help_keys(app) == [
-                "b", "a", "m", "i", "d", "p", "w", "W", "?", "q", "space", "+", "-", "]", "1-5", "Enter", "Tab", "Mouse",
+                "b", "a", "m", "d", "p", "w", "W", "?", "q", "space", "+", "-", "]", "1-5", "Enter", "Tab", "Mouse",
             ]  # fmt: skip
 
 
@@ -686,15 +686,29 @@ async def test_clicking_each_live_footer_key_does_what_its_key_does(clock: Virtu
                 assert app._exit
 
 
-@pytest.mark.parametrize("mode", ["demo", "stream"])
+@pytest.mark.parametrize("mode", ["demo", "replay", "stream"])
 async def test_the_footer_fits_80_columns_on_every_tab(clock: VirtualClock, mode: str) -> None:
     with sample_recording() as path:
-        app = make_app(ReplaySource(path, clock), clock, loop_replay=True) if mode == "demo" else app_with(clock)
+        if mode == "stream":
+            app = app_with(clock)
+        else:
+            app = make_app(ReplaySource(path, clock), clock, loop_replay=mode == "demo")
         async with app.run_test(size=(80, 24)) as pilot:
             for key in "12345":
                 await pilot.press(key)
                 keys = await footer_keys(pilot, app)
                 assert max(k.region.right for k in keys) <= 80, footer_text(keys)
+
+
+async def test_i_does_nothing_in_a_replay(clock: VirtualClock) -> None:
+    with sample_recording() as path:
+        app = make_app(ReplaySource(path, clock), clock)
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.pause()
+            assert "Wiki" not in footer_text(await footer_keys(pilot, app))
+            await pilot.press("i")
+            await pilot.pause()
+            assert not isinstance(app.screen, WikiPrompt)
 
 
 @pytest.mark.parametrize("label", ["Play", "Skip"])
