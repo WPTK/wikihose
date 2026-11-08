@@ -1,6 +1,7 @@
 # Exact versions the release builds with (pip -c). Only constrains; it installs nothing by itself, so Windows-only
 # entries are harmless elsewhere. Regenerate before a release when a dependency moved (see docs/release.md):
 #   python -m venv v; v\Scripts\pip install . "pyinstaller>=6.22,<7" "build>=1.6.1,<2" "hatchling>=1.33.0"; v\Scripts\pip freeze --exclude wikihose
+# Keep the macOS-only entry (macholib) by hand: a Windows freeze does not list it, and the macOS binaries need it pinned.
 altgraph==0.17.5
 anyio==4.16.0
 anysqlite==0.0.5
@@ -13,6 +14,7 @@ httpcore==1.0.9
 httpx==0.28.1
 idna==3.20
 linkify-it-py==2.2.0
+macholib==1.16.4
 markdown-it-py==4.2.0
 mdit-py-plugins==0.6.1
 mdurl==0.1.2

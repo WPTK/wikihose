@@ -72,7 +72,7 @@ walkthrough step that proves it on the exe.
 | 16 | The app is described as unofficial, and the README and `--help` say so. | `test_help_says_unofficial`; README review (manual) |
 | 17 | Panes showing Wikipedia text link to the article. | `test_e_on_a_log_row_opens_the_detail_with_the_article_link`, `test_the_diff_always_shows_the_address_of_the_article`; R3, D2 |
 | 18 | Orange is never a primary color or a background. | `tests/test_colours.py` (themes, every snapshot and docs SVG, the source) |
-| 19 | It installs with `pipx` from PyPI and as a single Windows exe. | smoke-test.md sections 1 and 2; `post-release.yml` (after the tag) |
+| 19 | It installs with `pipx` from PyPI and as a Windows exe, and from 0.2.0 as macOS and Linux binaries. | smoke-test.md sections 1, 1b and 2; `post-release.yml` (after the tag) |
 | 20 | Enter or a double click on a row opens that page on Wikipedia in the browser, on every tab with rows; on the Diff tab it opens the change; with no browser the address is shown. | `test_page_url`, `test_diff_url_names_the_newer_revision_as_the_diff_and_the_older_as_oldid`, `tests/test_browser.py` (`can_open_browser`), `test_enter_on_a_log_row_opens_that_page_in_the_browser`, `test_double_click_on_a_log_row_opens_that_page_in_the_browser`, `test_enter_and_double_click_on_a_reading_row_open_that_page_in_the_browser`, `test_enter_and_double_click_on_a_watched_page_open_it_in_the_browser`, `test_enter_and_double_click_on_a_convergence_row_open_that_page_in_the_browser`, `test_enter_and_double_click_on_the_diff_open_the_change_on_wikipedia`, `test_with_no_browser_the_address_is_shown_instead`; real-terminal Enter-over-SSH journey; G7 |
 
 ## State matrix

@@ -176,7 +176,7 @@ also needs, is a dev dependency).
 $env:WIKIHOSE_EXE = "$PWD\dist\wikihose.exe"; .venv\Scripts\python -m pytest tests/realterm -m uat -n 4
 ```
 
-The first runs `python -m wikihose --demo`; the second runs the built exe (build it with `scripts\build_exe.ps1`). The
+The first runs `python -m wikihose --demo`; the second runs the built exe (build it with `scripts\build_binary.py`, see [release.md](release.md)). The
 child gets `WIKIHOSE_CONFIG_DIR` and `WIKIHOSE_DATA_DIR` in a scratch directory and a dead proxy, so a run never touches
 your real settings or the network. Each test has a 90 second limit; the whole run takes about 20 to 35 seconds with
 `-n 4`.

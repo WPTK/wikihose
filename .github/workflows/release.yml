@@ -23,6 +23,8 @@ jobs:
     permissions:
       contents: read
       actions: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,6 +49,7 @@ jobs:
             echo "::error::no successful CI run for $TAG_SHA; wait for CI on main to finish and pass, then tag again"; exit 1
           fi
       - name: Check the tag against the version and the changelog
+        id: check
         env:
           TAG: ${{ github.ref_name }}
         run: |
@@ -71,6 +74,7 @@ jobs:
             echo "::error::CHANGELOG.md has no '## [$version] - YYYY-MM-DD' section with entries"; exit 1
           fi
           cat notes.md
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-notes
@@ -82,51 +86,63 @@ jobs:
     needs: verify
     uses: ./.github/workflows/build.yml
 
-  publish:
-    name: Create the GitHub release
+  # The file set and the tag are checked before anything is attested, so no signed claim is made about a moved tag or a
+  # stray file. publish repeats both checks.
+  check:
+    name: Check the files and the tag
     needs: [verify, build]
+    uses: WPTK/release-workflows/.github/workflows/check-release.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
+    with:
+      expected-files: |
+        wikihose-${{ needs.verify.outputs.version }}-py3-none-any.whl
+        wikihose-${{ needs.verify.outputs.version }}.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-windows-x86_64.exe
+        wikihose-${{ needs.verify.outputs.version }}-linux-x86_64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-linux-arm64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-macos-arm64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-macos-x86_64.tar.gz
+
+  # Provenance is made here, in this workflow, and not in the shared publish workflow: the certificate names the workflow
+  # that ran the step, and `gh attestation verify --signer-workflow` (README, docs/release.md, post-release.yml) expects
+  # this file. It attests the same artifacts the publish job releases.
+  attest:
+    name: Attest build provenance
+    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
+      contents: read
       id-token: write
       attestations: write
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          path: parts
-      - name: Collect the files and write SHA256SUMS
-        run: |
-          mkdir release
-          cp parts/dist/* parts/exe/* release/
-          cd release
-          sha256sum -- * > SHA256SUMS
-          cat SHA256SUMS
-      - name: Confirm the tag still points at the commit that was built
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          now=$(gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha)
-          if [ "$now" != "$GITHUB_SHA" ]; then
-            echo "::error::$TAG now points at $now, but this run built $GITHUB_SHA; not publishing"
-            exit 1
-          fi
+          pattern: binary-*
+          merge-multiple: true
+          path: release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: release
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: |
-            release/*
-            !release/SHA256SUMS
-      - name: Create the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          gh release create "$TAG" release/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "$TAG" \
-            --notes-file parts/release-notes/notes.md
+          subject-path: release/*
+
+  publish:
+    name: Create the GitHub release
+    needs: [verify, build, attest]
+    permissions:
+      contents: write
+    uses: WPTK/release-workflows/.github/workflows/publish-release.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
+    with:
+      expected-files: |
+        wikihose-${{ needs.verify.outputs.version }}-py3-none-any.whl
+        wikihose-${{ needs.verify.outputs.version }}.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-windows-x86_64.exe
+        wikihose-${{ needs.verify.outputs.version }}-linux-x86_64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-linux-arm64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-macos-arm64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-macos-x86_64.tar.gz
 
   # Uploads the wheel and sdist that the build job made and checked (not rebuilt). Runs only after the GitHub release
   # exists, so a tag that failed any gate never reaches PyPI. The `pypi` environment is the one the PyPI trusted

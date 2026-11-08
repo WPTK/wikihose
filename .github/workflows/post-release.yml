@@ -1,8 +1,10 @@
 name: Post-release
 
-# Checks a published release the way a user would: installs the version from PyPI with pipx and runs the published
-# Windows executable, each in a clean runner, then runs --version and --selftest. A failure means the release is
-# broken for users. It publishes nothing.
+# Checks a published release the way a user would: installs the version from PyPI with pipx and runs each published
+# binary on a runner of its own kind (Windows, Linux and macOS, x86_64 and arm64), each in a clean runner, then runs
+# --version and --selftest. A failure means the release is
+# broken for users. It publishes nothing. It expects the six-binary release layout of 0.2.0 and later; a manual run
+# against v0.1.0 (Windows exe only) fails by design.
 #
 # Triggers: `release: published` fires for releases made by a person. The Release workflow creates its release with
 # GITHUB_TOKEN, and GitHub does not start workflows from that token's events, so this also runs when the Release
@@ -58,43 +60,31 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-  assets:
-    name: Published files and checksums
+  # The shared workflow downloads every published file, checks SHA256SUMS and each attestation (signed by this
+  # repository's release.yml), then runs each binary on a runner of its own kind with nothing of ours installed.
+  published:
+    name: Published files and binaries
     needs: tag
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
       contents: read
       attestations: read
-    env:
-      TAG: ${{ needs.tag.outputs.tag }}
-      VERSION: ${{ needs.tag.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Download every published file from its public URL
-        run: |
-          mkdir dl && cd dl
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
-          curl -fsSL --retry 3 -O "$base/SHA256SUMS"
-          expected=$(awk '{print $2}' SHA256SUMS | sed 's/^\*//')
-          [ -n "$expected" ] || { echo "::error::SHA256SUMS lists no files"; exit 1; }
-          for f in $expected; do curl -fsSL --retry 3 -O "$base/$f" || { echo "::error::cannot download $f from $base"; exit 1; }; done
-          # Everything the release holds is listed in SHA256SUMS, and the other way round.
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -vx SHA256SUMS | sort > ../published.txt
-          printf '%s\n' $expected | sort > ../listed.txt
-          diff ../published.txt ../listed.txt || { echo "::error::SHA256SUMS and the published files differ"; exit 1; }
-      - name: Verify SHA256SUMS
-        run: cd dl && sha256sum -c SHA256SUMS
-      - name: Verify the build provenance attestation of each file
-        run: |
-          cd dl
-          for f in $(awk '{print $2}' SHA256SUMS | sed 's/^\*//'); do
-            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$TAG" || { echo "::error::no valid attestation for $f"; exit 1; }
-          done
-      - name: Check the wheel, sdist and executable are for this version
-        run: |
-          cd dl
-          ls "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz" "wikihose-$VERSION-windows-x86_64.exe"
+    uses: WPTK/release-workflows/.github/workflows/verify-published.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+      app: wikihose
+      asset-prefix: wikihose-${{ needs.tag.outputs.version }}
+      expected-files: |
+        wikihose-${{ needs.tag.outputs.version }}.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-py3-none-any.whl
+        wikihose-${{ needs.tag.outputs.version }}-windows-x86_64.exe
+        wikihose-${{ needs.tag.outputs.version }}-linux-x86_64.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-linux-arm64.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-macos-arm64.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-macos-x86_64.tar.gz
+      smoke-command: |
+        out=$("$BIN" --version); echo "$out"
+        [ "$out" = "wikihose ${{ needs.tag.outputs.version }}" ] || { echo "::error::expected 'wikihose ${{ needs.tag.outputs.version }}'"; exit 1; }
+        "$BIN" --selftest
 
   pipx:
     name: pipx install from PyPI (${{ matrix.os }})
@@ -130,33 +120,3 @@ jobs:
           out=$(wikihose --version); echo "$out"
           [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
           wikihose --selftest
-
-  exe:
-    name: Published Windows executable
-    needs: tag
-    runs-on: windows-latest
-    timeout-minutes: 15
-    env:
-      TAG: ${{ needs.tag.outputs.tag }}
-      VERSION: ${{ needs.tag.outputs.version }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      # No checkout and no Python step: the executable must run on a runner with nothing of ours installed.
-      - name: Download the published file and verify its checksum
-        run: |
-          mkdir bin && cd bin
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
-          name="wikihose-$VERSION-windows-x86_64.exe"
-          curl -fsSL --retry 3 -O "$base/SHA256SUMS"
-          curl -fsSL --retry 3 -O "$base/$name" || { echo "::error::cannot download $name"; exit 1; }
-          grep -F " $name" SHA256SUMS > one.sum || { echo "::error::$name is not listed in SHA256SUMS"; exit 1; }
-          sha256sum -c one.sum
-          cp "$name" wikihose.exe
-      - name: Run it
-        working-directory: bin
-        run: |
-          out=$(./wikihose.exe --version); echo "$out"
-          [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
-          ./wikihose.exe --selftest
