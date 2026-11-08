@@ -31,6 +31,7 @@ from wikihose.ui.bars import HealthBar, TopBar
 from wikihose.ui.bindings import declared_bindings, help_text, key_label
 from wikihose.ui.dialogs import FIXED_HELP, AddPage, HelpScreen
 from wikihose.ui.tabs.live import LiveTab
+from wikihose.ui.tabs.reading import Factory, ReadingTab
 from wikihose.ui.tabs.stub import STUBS, StubPane
 from wikihose.ui.theme import THEMES
 from wikihose.ui.widgets import PageTable
@@ -79,6 +80,8 @@ class MainScreen(Screen[None]):
         with TabbedContent(initial="live", id="tabs"):
             with TabPane("Live", id="live"):
                 yield LiveTab(shell.config, shell.clock, shell.tz, shell.store, shell.watchlist, shell.subscribe)
+            with TabPane("Reading", id="reading"):
+                yield ReadingTab(shell.reading, shell.wiki)
             for tab_id, (label, text) in STUBS.items():
                 with TabPane(label, id=tab_id):
                     yield StubPane(text)
@@ -171,6 +174,7 @@ class WikihoseApp(App[None]):
         tz: tzinfo | None = None,
         store: Store | None = None,
         config_path: Path | None = None,
+        reading: Factory | None = None,
     ) -> None:
         super().__init__()
         self.source = source
@@ -178,6 +182,7 @@ class WikihoseApp(App[None]):
         self.clock = clock
         self.tz: tzinfo = tz or datetime.now().astimezone().tzinfo or UTC
         self.store = store
+        self.reading: Factory = reading or (lambda _wiki: None)  # wiki -> Reading data; None in a replay
         self.config_path = config_path  # None: never write the config (--no-config)
         self.wiki = config.wiki
         self.watchlist = Watchlist()
@@ -322,6 +327,7 @@ class WikihoseApp(App[None]):
     def on_live_tab_wiki_changed(self, message: LiveTab.WikiChanged) -> None:
         self.wiki = message.wiki
         self._main.set_wiki(message.wiki)
+        self._main.query_one(ReadingTab).set_wiki(message.wiki)
         self.update_config(wiki=message.wiki)
 
     def update_config(self, **changes: Any) -> None:

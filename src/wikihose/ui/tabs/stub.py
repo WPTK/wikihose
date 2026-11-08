@@ -8,7 +8,6 @@ LATER = "Arrives in a later version."
 
 # tab id -> (tab label, what the tab will do)
 STUBS: dict[str, tuple[str, str]] = {
-    "reading": ("Reading", "Daily reading spikes: today's views against each article's 30-day median."),
     "watchlist": ("Watchlist", "Pages you track. Press w to add a page."),
     "diff": ("Diff", "Press Enter on a tracked edit to see what changed, in red and green."),
     "convergence": (

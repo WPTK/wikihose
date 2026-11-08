@@ -24,6 +24,7 @@ from wikihose.ui.app import WikihoseApp
 from wikihose.ui.bindings import declared_bindings, key_label
 from wikihose.ui.dialogs import FIXED_HELP
 from wikihose.ui.tabs.live import LiveTab
+from wikihose.ui.tabs.reading import ReadingTab
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -46,6 +47,8 @@ INVENTORY: dict[str, str] = {
     "binding:LiveTab:m:cycle_size": "test_size_key_cycles_through_the_steps",
     "binding:LiveTab:i:change_wiki": "test_i_switches_wiki_and_starts_the_numbers_over",
     "binding:LiveTab:p:toggle_pause": "test_pause_holds_the_log_while_the_numbers_keep_counting",
+    "binding:ReadingTab:r:refresh": "test_r_fetches_again",
+    "binding:ReadingTab:n:more_rows": "test_n_cycles_through_25_50_and_100_rows",
     "binding:HelpScreen:escape:dismiss": "test_help_closes",
     "binding:HelpScreen:question_mark:dismiss": "test_help_closes",
     "binding:AddPage:escape:dismiss(None)": "test_the_dialog_cancels_with_escape_and_with_the_button",
@@ -60,6 +63,8 @@ INVENTORY: dict[str, str] = {
     "footer:live:Watch": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Help": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Quit": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Refresh": "test_footer_keys_refresh_and_rows_work_when_clicked",
+    "footer:live:Rows": "test_footer_keys_refresh_and_rows_work_when_clicked",
     "footer:replay:Play": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     "footer:replay:Faster": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     "footer:replay:Slower": "test_clicking_each_replay_footer_key_does_what_its_key_does",
@@ -70,6 +75,8 @@ INVENTORY: dict[str, str] = {
     "help:m": "test_help_lists_the_active_keys_in_live_mode",
     "help:i": "test_help_lists_the_active_keys_in_live_mode",
     "help:p": "test_help_lists_the_active_keys_in_live_mode",
+    "help:r": "test_help_on_the_reading_tab_lists_its_keys",
+    "help:n": "test_help_on_the_reading_tab_lists_its_keys",
     "help:w": "test_help_lists_the_active_keys_in_live_mode",
     "help:?": "test_help_lists_the_active_keys_in_live_mode",
     "help:q": "test_help_lists_the_active_keys_in_live_mode",
@@ -115,7 +122,7 @@ def collected() -> dict[str, list[str]]:
     for cls in _ui_classes():
         for binding in _own_bindings(cls):
             found[f"binding:{cls.__name__}:{binding.key}:{binding.action}"] = _key_words(binding)
-    for cls in (WikihoseApp, LiveTab):
+    for cls in (WikihoseApp, LiveTab, ReadingTab):
         for binding in declared_bindings(cls):
             if binding.show:
                 mode = "replay" if binding.action.startswith("replay_") else "live"

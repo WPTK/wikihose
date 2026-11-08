@@ -9,11 +9,17 @@ import sys
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from wikihose import __version__
 from wikihose.clock import SystemClock
 from wikihose.config import Config, default_config_path, is_valid_wiki, load_config
 from wikihose.paths import db_path, log_dir
+
+if TYPE_CHECKING:
+    from wikihose.clock import Clock
+    from wikihose.net import Client
+    from wikihose.ui.tabs.reading import Factory
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,6 +94,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     return asyncio.run(run(args, config, config_path))
 
 
+def reading_factory(client: Client | None, clock: Clock) -> Factory | None:
+    """The Reading tab's data for a wiki, or None when there is no network client (a replay)."""
+    if client is None:
+        return None
+    from wikihose.reading import ReadingData
+
+    def make(wiki: str) -> ReadingData | None:
+        try:
+            return ReadingData(client, clock, wiki)
+        except ValueError:
+            return None  # a wiki the Pageviews project name cannot be worked out for
+
+    return make
+
+
 async def run(args: argparse.Namespace, config: Config, config_path: Path | None) -> int:
     """Build the data source the arguments ask for, then run the app (or the headless summary) on it."""
     from wikihose.net import Client, RequestBudget
@@ -120,7 +141,14 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
 
         store = Store(db_path()) if args.replay is None else None  # a replay must not add old edits to the database
         try:
-            app = WikihoseApp(source, config, clock=clock, store=store, config_path=config_path)
+            app = WikihoseApp(
+                source,
+                config,
+                clock=clock,
+                store=store,
+                config_path=config_path,
+                reading=reading_factory(client, clock),
+            )
             await app.run_async()
         finally:
             if store is not None:
