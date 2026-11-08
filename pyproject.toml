@@ -13,7 +13,7 @@ requires-python = ">=3.12"
 authors = [{ name = "WPTK" }]
 keywords = ["wikipedia", "wikimedia", "recentchange", "pageviews", "tui", "terminal", "textual"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
     "Programming Language :: Python :: 3.12",
