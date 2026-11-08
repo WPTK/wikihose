@@ -112,6 +112,9 @@ src/wikihose/
   exist, and an entry that matches no input. To add a key: declare the `Binding` with a `tooltip`, add its
   `binding:`, `footer:` and `help:` entries to `INVENTORY`, and write the test. A `manual:` prefix on the test name
   marks a check made by hand.
+- Text from the stream is untrusted. `parse_event` cleans user, title, comment and wiki (control and bidirectional
+  characters) and keeps `server_name` only when it is a Wikimedia host; `tests/test_hardening.py` covers it. Every
+  `notify` in `src/` passes `markup=False`.
 - Colour tests (`tests/test_colours.py`, helper `tests/colour.py`) keep orange out of backgrounds, as
   [design.md](design.md) describes under "Colors". Orange means hue 15 to 45 degrees, saturation above 35% and
   lightness 20% to 85%. They check that each theme's `primary`, `background`, `surface`, `panel`, `warning` and `accent`

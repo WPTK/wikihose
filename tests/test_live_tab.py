@@ -374,7 +374,7 @@ async def test_i_switches_wiki_and_starts_the_numbers_over(clock: VirtualClock) 
         assert log_titles(app) == ["Neu"]
 
 
-@pytest.mark.parametrize("bad", ["", "nope", "en wiki", "EN1wiki", "wikipedia"])
+@pytest.mark.parametrize("bad", ["", "nope", "en wiki", "enwiki x", "enwikix", "enwiki[/]", "EN1wiki", "wikipedia"])
 async def test_the_wiki_dialog_refuses_bad_names(clock: VirtualClock, bad: str) -> None:
     app = app_with(clock, [])
     async with app.run_test(size=(100, 30)) as pilot:
@@ -475,6 +475,34 @@ async def test_enter_on_a_top_row_opens_the_detail_of_its_latest_edit(clock: Vir
         assert "Second" in " ".join(str(label.render()) for label in detail.query("Label"))
 
 
-async def test_the_link_works_without_a_server_name(clock: VirtualClock) -> None:
+async def test_there_is_no_link_without_an_edit_or_a_trusted_host(clock: VirtualClock) -> None:
     detail = EditDetail("dewiki", "Ada Lovelace", None, EASTERN)
-    assert detail.url == "https://de.wikipedia.org/wiki/Ada_Lovelace"
+    assert detail.url is None
+    assert EditDetail("enwiki", "A", make_edit(server=""), EASTERN).url is None
+
+
+async def test_b_hides_and_shows_bot_edits(clock: VirtualClock) -> None:
+    app = app_with(clock, MIXED, config=Config(hide_bots=True))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        assert "Bot article" not in log_titles(app)
+        await pilot.press("b")
+        await pilot.pause()
+        assert "Bot article" in log_titles(app)
+        assert "bots shown" in filters_text(app)
+        await pilot.press("b")
+        await pilot.pause()
+        assert "Bot article" not in log_titles(app)
+
+
+async def test_tab_moves_the_focus_between_the_log_and_the_top_table(clock: VirtualClock) -> None:
+    app = app_with(clock, [make_edit("One"), make_edit("Two")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        assert app.focused is app.query_one("#log")
+        await pilot.press("tab")
+        assert app.focused is app.query_one("#top")
+        await pilot.press("shift+tab")
+        assert app.focused is app.query_one("#log")
+        await pilot.press("tab", "tab", "tab")  # log, top, tab strip, and round to the log again
+        assert app.focused is app.query_one("#log")

@@ -7,12 +7,14 @@ from collections import deque
 from collections.abc import Callable
 from datetime import tzinfo
 
+from rich.style import Style
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
+from textual.markup import escape
 from textual.message import Message
 from textual.widgets import DataTable, Sparkline, Static
 
@@ -70,6 +72,14 @@ def log_columns(width: int) -> list[tuple[str, int]]:
         widths = {"Article": rest}
     widths.update({"Time": TIME_WIDTH, "Bytes": BYTES_WIDTH, "Editor": EDITOR_WIDTH})
     return [(label, widths[label]) for label in labels]
+
+
+class Stamp(Text):
+    """The time cell of a log row. It carries the row's sequence number, which the log sorts on (newest first)."""
+
+    def __init__(self, text: str, *, style: str | Style, seq: int) -> None:
+        super().__init__(text, style=style)
+        self.seq = seq
 
 
 class FilterLine(Static):
@@ -217,9 +227,39 @@ class LiveTab(Vertical):
         """Move queued edits into the log. Runs every quarter second, so a burst is one redraw. No-op when paused."""
         if self.paused or not self._pending:
             return
+        added: list[tuple[str, Edit]] = []
+        dropped: list[tuple[str, Edit]] = []
         while self._pending:
-            self._rows.appendleft(self._pending.popleft())
-        self._draw_log()
+            if len(self._rows) == LOG_LIMIT:
+                dropped.append(self._rows[-1])  # appendleft pushes the oldest row off the far end
+            entry = self._pending.popleft()
+            self._rows.appendleft(entry)
+            added.append(entry)
+        if self._columns:
+            self._add_rows(added, dropped)
+
+    def _add_rows(self, added: list[tuple[str, Edit]], dropped: list[tuple[str, Edit]]) -> None:
+        """Put new rows into the table without rebuilding it, so the reader's place is kept.
+
+        The rows are added, the oldest are removed from the bottom, and the table is sorted newest first on the
+        sequence number each time cell carries. When the reader is not at the top, the view moves down by the number of
+        rows added, so the same rows stay in view and the cursor stays on its row.
+        """
+        table = self.query_one("#log", PageTable)
+        keep = table.cursor_key()
+        scroll = table.scroll_y
+        at_top = table.cursor_row == 0 and scroll == 0
+        for key, edit in added:
+            self._edits[key] = edit
+            table.add_row(*self._row_cells(key, edit), key=key)
+        for key, _ in dropped:
+            self._edits.pop(key, None)
+            table.remove_row(key)
+        table.sort("Time", key=lambda stamp: -stamp.seq)
+        if not at_top:
+            if keep in self._edits:
+                table.move_cursor(row=table.get_row_index(keep), animate=False, scroll=False)
+            self.call_after_refresh(table.scroll_to, y=scroll + len(added), animate=False, immediate=True)
 
     def _refill(self) -> None:
         """Rebuild the log from the ring after a filter changed."""
@@ -245,6 +285,7 @@ class LiveTab(Vertical):
         table = self.query_one("#log", PageTable)
         keep = table.cursor_key()
         at_top = table.cursor_row == 0
+        scroll = table.scroll_y  # a redraw every quarter second must not throw the reader back to the top
         table.clear(columns=True)
         for label, width in self._columns:
             table.add_column(label, width=width, key=label)
@@ -253,12 +294,15 @@ class LiveTab(Vertical):
             self._edits[key] = edit
             table.add_row(*self._row_cells(key, edit), key=key)
         if keep in self._edits and not at_top:
-            table.move_cursor(row=table.get_row_index(keep), animate=False)
+            table.move_cursor(row=table.get_row_index(keep), animate=False, scroll=False)
+        if scroll:
+            self.call_after_refresh(table.scroll_to, y=scroll, animate=False, immediate=True)
 
     def _row_cells(self, key: str, edit: Edit) -> list[Text]:
         cells = self._cells.get(key)
         if cells is None:
             cells = self._build_cells(edit)
+            cells[0] = Stamp(cells[0].plain, style=cells[0].style, seq=int(key[1:]))  # the log sorts on it
             self._cells[key] = cells
             if len(self._cells) > 2 * LOG_LIMIT:  # forget rows that scrolled out of the log
                 for old in [k for k in self._cells if k not in self._edits and k != key]:
@@ -355,7 +399,7 @@ class LiveTab(Vertical):
 
     def _draw_filters(self) -> None:
         def word(what: str, text: str) -> str:
-            return f"[$primary @click=pick('{what}')]{text}[/]"
+            return f"[$primary @click=pick('{what}')]{escape(text)}[/]"
 
         parts = [
             word("wiki", self.wiki),
@@ -375,7 +419,9 @@ class LiveTab(Vertical):
             "size": self.action_cycle_size,
             "pause": self.action_toggle_pause,
         }
-        actions[event.what]()
+        action = actions.get(event.what)
+        if action is not None:  # an unknown word does nothing
+            action()
 
     def _filters_changed(self) -> None:
         self._draw_filters()

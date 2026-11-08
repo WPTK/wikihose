@@ -25,7 +25,7 @@ from wikihose.sources.recording import sample_recording
 from wikihose.sources.replay import ReplaySource
 from wikihose.ui.app import TooSmall, WikihoseApp
 from wikihose.ui.bars import HealthBar, TopBar
-from wikihose.ui.dialogs import AddPage, EditDetail, HelpScreen
+from wikihose.ui.dialogs import AddPage, EditDetail, HelpScreen, WikiPrompt
 
 TAB_IDS = ["live", "reading", "watchlist", "diff", "convergence"]
 
@@ -288,9 +288,7 @@ async def test_clicking_help_in_the_footer_opens_help(clock: VirtualClock) -> No
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        key = next(k for k in await footer_keys(pilot, app, needing="Help") if "Help" in str(k.render()))
-        await pilot.click(offset=(key.region.x + 1, key.region.y))
-        await pilot.pause()
+        await click_footer(pilot, app, "Help")
         assert isinstance(app.screen, HelpScreen)
 
 
@@ -298,9 +296,7 @@ async def test_clicking_a_footer_key_runs_its_action(clock: VirtualClock) -> Non
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        key = next(k for k in await footer_keys(pilot, app, needing="Bots") if "Bots" in str(k.render()))
-        await pilot.click(offset=(key.region.x + 1, key.region.y))
-        await pilot.pause()
+        await click_footer(pilot, app, "Bots")
         assert live_tab(app).hide_bots is False
 
 
@@ -560,3 +556,73 @@ async def test_edit_detail_is_not_a_help_screen_and_closes_with_escape(clock: Vi
         assert not isinstance(app.screen, EditDetail)
         assert Label  # imported for the other tests' selectors
         assert TopBar
+
+
+# --- every footer key works when clicked -----------------------------------------------------------------------------
+
+
+async def click_footer(pilot, app, label: str) -> None:
+    """Click the footer key with this label, once the footer has stopped rebuilding itself (it does so when focus moves)."""
+    last, steady = None, 0
+    for _ in range(100):
+        keys = await footer_keys(pilot, app, needing=label)
+        state = [(id(k), k.region) for k in keys]
+        steady = steady + 1 if state == last else 0
+        last = state
+        if steady >= 3:
+            break
+        await pilot.pause()
+    else:
+        raise AssertionError(f"the footer never stopped changing while waiting to click {label!r}")
+    key = next((k for k in keys if label in str(k.render())), None)
+    assert key is not None, f"no footer key labelled {label!r}; the footer shows {footer_text(keys)!r}"
+    await pilot.click(key)
+    await pilot.pause()
+
+
+@pytest.mark.parametrize("label", ["Bots", "Articles", "Size", "Wiki", "Pause", "Watch", "Help", "Quit"])
+async def test_clicking_each_live_footer_key_does_what_its_key_does(clock: VirtualClock, label: str) -> None:
+    app = app_with(clock)
+    async with app.run_test(size=(140, 30)) as pilot:
+        tab = live_tab(app)
+        before = (tab.hide_bots, tab.articles_only, tab.min_bytes, tab.paused)
+        await click_footer(pilot, app, label)
+        after = (tab.hide_bots, tab.articles_only, tab.min_bytes, tab.paused)
+        match label:
+            case "Bots":
+                assert after[0] != before[0]
+            case "Articles":
+                assert after[1] != before[1]
+            case "Size":
+                assert after[2] != before[2]
+            case "Pause":
+                assert after[3] != before[3]
+            case "Wiki":
+                assert isinstance(app.screen, WikiPrompt)
+            case "Watch":
+                assert isinstance(app.screen, AddPage)
+            case "Help":
+                assert isinstance(app.screen, HelpScreen)
+            case "Quit":
+                assert app._exit
+
+
+@pytest.mark.parametrize("label", ["Play", "Faster", "Slower", "Skip"])
+async def test_clicking_each_replay_footer_key_does_what_its_key_does(clock: VirtualClock, label: str) -> None:
+    with sample_recording() as path:
+        source = ReplaySource(path, clock)
+        source.pause()
+        app = make_app(source, clock)
+        async with app.run_test(size=(140, 30)) as pilot:
+            before = source.moment()
+            await click_footer(pilot, app, label)
+            match label:
+                case "Play":
+                    assert not source.paused
+                case "Faster":
+                    assert source.speed == 2
+                case "Slower":
+                    assert source.speed == 0.5
+                case "Skip":
+                    assert (source.moment() - before).total_seconds() == 60
+            await wait_for_stream(app, pilot) if not source.paused else None

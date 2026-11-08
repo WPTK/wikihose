@@ -1,0 +1,87 @@
+name: Build
+
+# Builds the sdist, the wheel and the Windows executable, and checks each one runs. Called by release.yml on a tag; also
+# runs by hand and on pull requests that touch the build, so a broken build shows up before a release rather than during
+# one. Nothing here publishes anything and it has no secrets.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/build_exe.ps1
+      - .github/release-constraints.txt
+      - pyproject.toml
+      - src/wikihose/**
+      - .github/workflows/build.yml
+
+permissions:
+  contents: read
+
+# Pins the isolated build environment too (hatchling and its dependencies), which a -c on the command line does not.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/.github/release-constraints.txt
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  dist:
+    name: sdist and wheel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -c .github/release-constraints.txt "build>=1.6.1,<2"
+      - run: python -m build --outdir dist
+      - name: Check the wheel installs and runs
+        run: |
+          python -m venv wheel-check
+          wheel-check/bin/python -m pip install -c .github/release-constraints.txt dist/*.whl
+          wheel-check/bin/wikihose --version
+          wheel-check/bin/wikihose --selftest
+      - name: Check the sdist installs and runs
+        run: |
+          python -m venv sdist-check
+          sdist-check/bin/python -m pip install -c .github/release-constraints.txt dist/*.tar.gz
+          sdist-check/bin/wikihose --selftest
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  exe:
+    name: Windows executable
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      # tzdata is in the package's own dependencies on Windows, so the executable carries its own zone files.
+      - run: python -m pip install -c .github/release-constraints.txt . "pyinstaller>=6.22,<7"
+      - name: Build, then run --version and --selftest on the result
+        run: scripts/build_exe.ps1
+      - name: Name the file
+        shell: bash
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/wikihose/__init__.py)
+          mkdir out
+          cp dist/wikihose.exe "out/wikihose-$version-windows-x86_64.exe"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: exe
+          path: out/*
+          if-no-files-found: error
+          retention-days: 7
