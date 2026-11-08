@@ -1,0 +1,97 @@
+[build-system]
+requires = ["hatchling>=1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wikihose"
+dynamic = ["version"]
+description = "Watch Wikipedia live in your terminal: edits, reading spikes and the pages you track. Unofficial."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "WPTK" }]
+keywords = ["wikipedia", "wikimedia", "recentchange", "pageviews", "tui", "terminal", "textual"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "textual>=8.2,<9",
+    "httpx>=0.28,<1",
+    "platformdirs>=4,<5",
+    "stamina>=26,<27",
+    "hishel>=2,<3",
+    "tomli-w>=1,<2",
+    "tzdata>=2024.1; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "textual==8.2.8",
+    "pytest>=8,<9",
+    "pytest-asyncio>=1.4.1",
+    "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
+    "pytest-textual-snapshot>=1.1",
+    "respx>=0.23.1",
+    "hypothesis>=6.170.14",
+    "ruff>=0.17.3",
+    "vulture>=2.16",
+    "mypy>=2.4.1",
+    "build>=1.6.1,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/WPTK/wikihose"
+Issues = "https://github.com/WPTK/wikihose/issues"
+Changelog = "https://github.com/WPTK/wikihose/blob/main/CHANGELOG.md"
+
+[project.scripts]
+wikihose = "wikihose.cli:main"
+
+[tool.hatch.version]
+path = "src/wikihose/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wikihose"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+timeout = 60  # seconds per test (--timeout=0 turns it off)
+addopts = "-m 'not uat'"
+markers = [
+    "live: hits the real Wikimedia endpoints; skipped unless WIKIHOSE_LIVE=1",
+    "uat: user-journey tests that drive the whole app",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4", "RUF"]
+ignore = [
+    # Textual widgets declare BINDINGS/DEFAULT_CSS as plain class attributes by convention.
+    "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Long lines in tests are inline fixture payloads; wrapping them hurts readability.
+"tests/**" = ["E501", "RUF001"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/wikihose"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+
+[tool.vulture]
+paths = ["src", "tests"]
+min_confidence = 80
