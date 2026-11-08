@@ -36,7 +36,7 @@ Python 3.12 (the floor) and 3.13 must pass. 3.14 runs but does not block a merge
 - Work on a branch cut from `main`. Use a short descriptive name.
 - Open a PR to `main`. The description says what changed, why (the root cause, for a fix) and how you verified it.
   Link the issue with `Closes #N`.
-- For interface changes, drive the flow in the running app (Pilot or `--replay`) and include a screenshot.
+- For interface changes, drive the flow in the running app (Pilot, `--replay FILE` or `--demo`) and include a screenshot.
 - Keep prose and docs PRs separate from workflow and script PRs.
 - PRs merge when CI is green on the latest commit after a review pass.
 

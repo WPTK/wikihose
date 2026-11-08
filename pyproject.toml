@@ -7,8 +7,8 @@ name = "wikihose"
 dynamic = ["version"]
 description = "Watch Wikipedia live in your terminal: edits, reading spikes and the pages you track. Unofficial."
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND CC-BY-SA-4.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.12"
 authors = [{ name = "WPTK" }]
 keywords = ["wikipedia", "wikimedia", "recentchange", "pageviews", "tui", "terminal", "textual"]
@@ -55,6 +55,9 @@ wikihose = "wikihose.cli:main"
 
 [tool.hatch.version]
 path = "src/wikihose/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "scripts", "README.md", "LICENSE", "NOTICE", "CHANGELOG.md", "CONTRIBUTING.md", "pyproject.toml"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/wikihose"]

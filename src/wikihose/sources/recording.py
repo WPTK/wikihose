@@ -181,3 +181,10 @@ def sample_recording() -> Iterator[Path]:
     """The sample recording that ships in the wheel (``wikihose/data/sample.jsonl.gz``), as a real file path."""
     with importlib.resources.as_file(importlib.resources.files("wikihose") / "data" / "sample.jsonl.gz") as path:
         yield path
+
+
+@contextmanager
+def demo_recording() -> Iterator[Path]:
+    """The demo recording that ships in the wheel (``wikihose/data/demo-enwiki.jsonl.gz``), as a real file path."""
+    with importlib.resources.as_file(importlib.resources.files("wikihose") / "data" / "demo-enwiki.jsonl.gz") as path:
+        yield path

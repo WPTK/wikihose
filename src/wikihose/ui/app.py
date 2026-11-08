@@ -175,6 +175,7 @@ class WikihoseApp(App[None]):
         store: Store | None = None,
         config_path: Path | None = None,
         reading: Factory | None = None,
+        loop_replay: bool = False,
     ) -> None:
         super().__init__()
         self.source = source
@@ -187,6 +188,7 @@ class WikihoseApp(App[None]):
         self.wiki = config.wiki
         self.watchlist = Watchlist()
         self.replay_finished = False
+        self.loop_replay = loop_replay  # the demo: start the replay over when it ends, with an empty log
         self._subscribers: list[Callable[[StreamItem], None]] = []
         self._main = MainScreen(self)
         for theme in THEMES:
@@ -210,14 +212,22 @@ class WikihoseApp(App[None]):
         self._subscribers.append(callback)
 
     async def _pump(self) -> None:
-        async for item in self.source.items():
-            self._dispatch(item)
+        while True:
+            async for item in self.source.items():
+                self._dispatch(item)
+            if not (self.loop_replay and isinstance(self.source, ReplaySource)):
+                return
+            if not self.source.rewind():
+                return  # closed while it played
+            self._main.query_one(LiveTab).start_over()  # not self.query_one: a dialog may be the active screen
+            self._main.refresh_top_bar()
 
     def _dispatch(self, item: StreamItem) -> None:
         if isinstance(item, FeedStatus):
             if isinstance(self.source, ReplaySource) and item.state == "down" and item.detail == REPLAY_FINISHED:
-                self.replay_finished = True  # the end of a recording is not a failure
-                self._main.refresh_top_bar()
+                if not self.loop_replay:
+                    self.replay_finished = True  # the end of a recording is not a failure
+                    self._main.refresh_top_bar()
             else:
                 self._main.handle_status(item)
             return
