@@ -32,6 +32,8 @@ def _isolated_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """No test reads or writes the real config or data directory."""
     monkeypatch.setenv("WIKIHOSE_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.setenv("WIKIHOSE_DATA_DIR", str(tmp_path / "data"))
+    # Textual and Rich read NO_COLOR when an app or console is made; a shell that sets it would turn the snapshots mono.
+    monkeypatch.delenv("NO_COLOR", raising=False)
 
 
 @pytest.fixture
