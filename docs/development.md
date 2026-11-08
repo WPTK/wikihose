@@ -148,6 +148,31 @@ src/wikihose/
 
 - Tests marked `uat` drive the whole app and are left out of the default run.
 
+## Real-terminal run
+
+`tests/realterm/` runs the real program in a real pseudo-terminal (ConPTY on Windows, a pty elsewhere) with
+Microsoft's `tui-test`, through `tests/uat_kit/`, a kit vendored from the wxbrief repository (each file names the source
+commit). It sends the bytes a terminal sends, keys and SGR mouse reports with pointer motion before each click, and
+asserts on the rendered screen; a failed wait fails with a dump of the screen. The journeys run at 80x24 and 120x30:
+start on the Live tab, keys `1` to `5`, clicking each tab label, clicking `Help` in the footer, `?` and Escape, `b` and
+`a`, the replay keys (`+`, space), the too-small cover at 70x20 and back, and `q` exiting with code 0 and leaving no
+process. The tests are marked `uat`, so the default run leaves them out; `tests/uat_kit/test_kit.py` (the kit's own
+test, against a tiny echo program) is in the default run and skips itself when tui-test is missing.
+
+```powershell
+.venv\Scripts\python -m pytest tests/realterm -m uat -n 4
+$env:WIKIHOSE_EXE = "$PWD\dist\wikihose.exe"; .venv\Scripts\python -m pytest tests/realterm -m uat -n 4
+```
+
+The first runs `python -m wikihose --demo`; the second runs the built exe (build it with `scripts\build_exe.ps1`). The
+child gets `WIKIHOSE_CONFIG_DIR` and `WIKIHOSE_DATA_DIR` in a scratch directory and a dead proxy, so a run never touches
+your real settings or the network. Each test has a 90 second limit; the whole run takes about 20 to 35 seconds with
+`-n 4`.
+
+Not covered: Windows Terminal rendering (fonts, colours, glyph widths), real tmux or SSH sessions, the live stream (the
+journeys play the bundled demo), and the Reading and Convergence tabs with real data (a replay shows their "needs a
+live connection" messages).
+
 ## Recording live data
 
 Fixtures are real payloads. When you capture them:
