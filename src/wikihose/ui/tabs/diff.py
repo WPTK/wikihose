@@ -7,6 +7,7 @@ diff is of a watched page and reaches the newest revision wikihose knows about, 
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import tzinfo
 
@@ -19,7 +20,10 @@ from textual.widgets import Static
 
 from wikihose.diff import DiffError, DiffHeader, fetch_diff, render_diff
 from wikihose.net import Client
+from wikihose.store import WatchedPage
 from wikihose.watchlist import Watchlist
+
+log = logging.getLogger(__name__)
 
 EMPTY = (
     "No change is open.\n\n"
@@ -69,6 +73,7 @@ class DiffTab(Vertical):
         self._tz = tz
         self.request: DiffRequest | None = None
         self.state = "empty"  # empty, loading, shown or error
+        self._page: WatchedPage | None = None  # the watched page the request is about, found when it was made
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="diff-scroll"):
@@ -77,6 +82,8 @@ class DiffTab(Vertical):
     def show(self, request: DiffRequest) -> None:
         """Start loading ``request``. A request made while another is loading replaces it."""
         self.request = request
+        # Find the watched page now: a move while the diff loads would change the title it is found under.
+        self._page = self._watchlist.match(request.wiki, request.header.title)
         self.state = "loading"
         self._set(Text(LOADING, style="dim"))
         self.run_worker(self._load(request), name="diff", group="diff", exclusive=True)
@@ -90,11 +97,16 @@ class DiffTab(Vertical):
         except DiffError as exc:
             self._fail(str(exc))
             return
+        except Exception:  # an odd answer must cost this diff, not the app
+            log.exception("showing a diff failed")
+            self._fail("Something went wrong while showing that change.")
+            return
         self.state = "shown"
         self._set(render_diff(diff, request.header, tz=self._tz))
         self.query_one("#diff-scroll", VerticalScroll).scroll_home(animate=False)
-        page = self._watchlist.match(request.wiki, request.header.title)
-        if page is not None and request.to_rev >= page.last_rev_id:
+        page = None if self._page is None else self._watchlist.current(self._page)
+        # Only a diff that covers everything unseen counts as having looked at the page.
+        if page is not None and request.from_rev <= page.seen_rev_id and request.to_rev >= page.last_rev_id:
             self._watchlist.mark_seen(page)
 
     def _fail(self, message: str) -> None:

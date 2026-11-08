@@ -20,6 +20,7 @@ from wikihose.paths import db_path, log_dir
 if TYPE_CHECKING:
     from wikihose.clock import Clock
     from wikihose.net import Client
+    from wikihose.store import WatchedPage
     from wikihose.ui.tabs.reading import Factory
 
 DEMO_WIKI = "enwiki"
@@ -104,6 +105,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     return asyncio.run(run(args, config, config_path))
 
 
+def _saved_watchlist() -> list[WatchedPage]:
+    """The reader's watched pages for a replay, which gets them read-only. Nothing when there is no database yet."""
+    from wikihose.store import Store
+
+    path = db_path()
+    if not path.exists():
+        return []
+    saved = Store(path)
+    try:
+        return list(saved.watched_pages())
+    finally:
+        saved.close()
+
+
 def reading_factory(client: Client | None, clock: Clock) -> Factory | None:
     """The Reading tab's data for a wiki, or None when there is no network client (a replay)."""
     if client is None:
@@ -159,6 +174,7 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
 
         replaying = args.replay is not None or args.demo
         store = None if replaying else Store(db_path())  # a replay must not add old edits to the database
+        saved = _saved_watchlist() if replaying else []
         try:
             app = WikihoseApp(
                 source,
@@ -169,6 +185,7 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
                 reading=reading_factory(client, clock),
                 client=client,
                 loop_replay=args.demo,
+                saved_watchlist=saved,
             )
             await app.run_async()
         finally:

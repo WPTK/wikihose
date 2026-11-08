@@ -24,7 +24,7 @@ from wikihose.diff import DiffHeader
 from wikihose.live_stats import LiveStats
 from wikihose.sources.events import Edit, StreamItem
 from wikihose.store import Store
-from wikihose.titles import page_key
+from wikihose.titles import article_url, page_key
 from wikihose.ui.dialogs import EditDetail, WikiPrompt
 from wikihose.ui.tabs.diff import DiffRequest, OpenDiff
 from wikihose.ui.widgets import PageTable
@@ -183,7 +183,7 @@ class LiveTab(Vertical):
 
     def on_mount(self) -> None:
         self._subscribe(self.accept)
-        self._watchlist.subscribe(self._watchlist_changed)
+        self._watchlist.subscribe_members(self._watchlist_changed)
         top = self.query_one("#top", PageTable)
         top.add_column("Edits", width=TOP_EDITS_WIDTH, key="Edits")
         top.add_column("Article", width=TOP_TITLE_WIDTH, key="Article")
@@ -348,6 +348,13 @@ class LiveTab(Vertical):
         return cells
 
     def _watchlist_changed(self) -> None:
+        """A page was added or removed or renamed: redraw the log for the stars. Counts changing does not come here.
+        Runs on the tab's own message loop, never from a worker."""
+        self.call_later(self._restar)
+
+    def _restar(self) -> None:
+        if not self.is_mounted:
+            return
         self._cells.clear()
         self._draw_log()
         self.refresh_side()
@@ -493,12 +500,20 @@ class LiveTab(Vertical):
         edit = self._edit_under_cursor()
         if edit is None:
             return
-        if edit.kind == "new" or not edit.rev_old:
+        if edit.kind == "new":
             self.app.notify("That edit created the page, so there is nothing to compare it with.", timeout=4)
-        elif edit.rev_new is None:
+        elif not edit.rev_old or edit.rev_new is None:
             self.app.notify("That edit did not say which revision it made, so it cannot be compared.", timeout=4)
         else:
-            header = DiffHeader(edit.title, edit.user, edit.comment, edit.at, edit.old_len, edit.new_len)
+            header = DiffHeader(
+                edit.title,
+                edit.user,
+                edit.comment,
+                edit.at,
+                edit.old_len,
+                edit.new_len,
+                article_url(edit.server_name, edit.title),
+            )
             self.post_message(OpenDiff(DiffRequest(edit.wiki, edit.rev_old, edit.rev_new, header)))
 
     def _edit_under_cursor(self) -> Edit | None:

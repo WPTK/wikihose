@@ -18,6 +18,7 @@ from textual.widgets import DataTable, Static
 
 from wikihose.diff import DiffHeader
 from wikihose.store import WatchedPage
+from wikihose.titles import article_url, host_for_wiki
 from wikihose.ui.dialogs import ConfirmRemove
 from wikihose.ui.tabs.diff import DiffRequest, OpenDiff
 from wikihose.watchlist import Watchlist
@@ -59,19 +60,32 @@ class WatchlistTab(Vertical):
         self._tz = tz
         self._editor_of = editor_of
         self._rows: dict[str, WatchedPage] = {}
+        self._pending = False  # a redraw is already queued
+        self._layout: tuple[bool, int] | None = None  # (wide, title width) the columns were built for
 
     def compose(self) -> ComposeResult:
         yield Static(EMPTY, id="watch-empty")
         yield DataTable(id="watch-table", cursor_type="row", zebra_stripes=False)
 
     def on_mount(self) -> None:
-        self._watchlist.subscribe(self.refresh_rows)
+        self._watchlist.subscribe(self._schedule_refresh)
         self.refresh_rows()
 
     def on_resize(self, event: events.Resize) -> None:
         self.refresh_rows()
 
     # --- drawing -----------------------------------------------------------------------------------------------------
+
+    def _schedule_refresh(self) -> None:
+        """Many changes in a row (a catch-up page by page) draw the table once."""
+        if self._pending or not self.is_mounted:
+            return
+        self._pending = True
+        self.call_later(self._refresh_now)
+
+    def _refresh_now(self) -> None:
+        self._pending = False
+        self.refresh_rows()
 
     def refresh_rows(self) -> None:
         if not self.is_mounted:
@@ -84,17 +98,21 @@ class WatchlistTab(Vertical):
         keep_key = None if keep is None else page_key_of(keep)
         scroll = table.scroll_y
         wide = self.size.width >= EDITOR_FROM
-        table.clear(columns=True)
         fixed = WIKI_WIDTH + UNSEEN_WIDTH + LAST_WIDTH + STATUS_WIDTH + (EDITOR_WIDTH + TREND_WIDTH if wide else 0)
         title_width = max(self.size.width - fixed - 2 * (5 + 2 * wide) - 2, 12)
-        table.add_column("Wiki", width=WIKI_WIDTH)
-        table.add_column("Page", width=title_width)
-        table.add_column("New", width=UNSEEN_WIDTH)
-        table.add_column("Last edit", width=LAST_WIDTH)
-        if wide:
-            table.add_column("Editor", width=EDITOR_WIDTH)
-            table.add_column("Trend", width=TREND_WIDTH)
-        table.add_column("Status", width=STATUS_WIDTH)
+        if self._layout == (wide, title_width):
+            table.clear()  # same columns: only the rows change
+        else:
+            table.clear(columns=True)
+            table.add_column("Wiki", width=WIKI_WIDTH)
+            table.add_column("Page", width=title_width)
+            table.add_column("New", width=UNSEEN_WIDTH)
+            table.add_column("Last edit", width=LAST_WIDTH)
+            if wide:
+                table.add_column("Editor", width=EDITOR_WIDTH)
+                table.add_column("Trend", width=TREND_WIDTH)
+            table.add_column("Status", width=STATUS_WIDTH)
+            self._layout = (wide, title_width)
         self._rows = {}
         theme = self.app.current_theme
         for page in pages:
@@ -137,7 +155,14 @@ class WatchlistTab(Vertical):
         if page.seen_rev_id <= 0 or page.last_rev_id <= page.seen_rev_id:
             self.app.notify(f"Nothing new on {page.title} since you last looked.", timeout=4, markup=False)
             return
-        header = DiffHeader(title=page.title, user=self._editor_of(page), at=page.last_edit_at)
+        # One new edit has one editor; several do not, and the last editor alone would read as the author of all.
+        user = self._editor_of(page) if page.unseen == 1 else ""
+        header = DiffHeader(
+            title=page.title,
+            user=user,
+            at=page.last_edit_at,
+            url=article_url(host_for_wiki(page.wiki) or "", page.title),
+        )
         self.post_message(OpenDiff(DiffRequest(page.wiki, page.seen_rev_id, page.last_rev_id, header)))
 
     def action_mark_seen(self) -> None:

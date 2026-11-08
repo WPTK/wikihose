@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, tzinfo
 from typing import Any, Literal
 
+from rich.style import Style
 from rich.text import Text
 
 from wikihose.messages import describe_fetch_error
@@ -85,6 +86,7 @@ class DiffHeader:
     at: datetime | None = None
     size_before: int | None = None
     size_after: int | None = None
+    url: str | None = None  # the article's address; its text is CC BY-SA, so the heading always says where it is from
 
 
 def diff_url(wiki: str, from_id: int, to_id: int) -> str | None:
@@ -225,6 +227,9 @@ def _heading(header: DiffHeader, diff: RevisionDiff, tz: tzinfo) -> Text:
         if header.size_before is not None:
             size = f"{header.size_before:,} to {size} ({header.size_after - header.size_before:+,})"
         out.append("\n" + size, style="dim")
+    if header.url:
+        out.append("\n")
+        out.append(header.url, style=Style(link=header.url, underline=True))
     out.append(f"\nRevisions {diff.from_id} to {diff.to_id}", style="dim")
     return out
 

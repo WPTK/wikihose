@@ -9,7 +9,7 @@ memory, no requests), runs the startup catch-up in a worker and keeps the Watchl
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
@@ -202,6 +202,7 @@ class WikihoseApp(App[None]):
         client: Client | None = None,
         reading: Factory | None = None,
         loop_replay: bool = False,
+        saved_watchlist: Sequence[WatchedPage] = (),
     ) -> None:
         super().__init__()
         self.source = source
@@ -214,9 +215,24 @@ class WikihoseApp(App[None]):
         self.wiki = config.wiki
         self.client = client  # None in a replay: no network, so nothing to add and no catch-up
         # Without a database (a replay) the watchlist lives in memory for this run only.
-        self._scratch = Store(":memory:") if store is None else None
-        self.watchlist = Watchlist(store or self._scratch or Store(":memory:"), client, clock)
+        # A replay still matches live edits against the reader's saved list: it gets a read-only copy of the rows.
+        self._scratch: Store | None = None
+        backing = store
+        if backing is None:
+            backing = self._scratch = Store(":memory:")
+            for saved in saved_watchlist:
+                backing.add_watch(saved.wiki, saved.page_id, saved.title, saved.added_at, saved.seen_rev_id)
+                backing.set_watch_state(
+                    saved.wiki,
+                    saved.page_id,
+                    unseen=saved.unseen,
+                    last_rev_id=saved.last_rev_id,
+                    last_edit_at=saved.last_edit_at,
+                    deleted=saved.deleted,
+                )
+        self.watchlist = Watchlist(backing, client, clock)
         self._editors: dict[tuple[str, int], str] = {}  # last editor seen this run, by (wiki, page ID)
+        self._badge_queued = False
         self._tab = "live"
         self._previous_tab = "live"
         self.replay_finished = False
@@ -303,7 +319,15 @@ class WikihoseApp(App[None]):
         self.show_unseen()
 
     def show_unseen(self) -> None:
-        self._on_main(self._main.set_badge, self.watchlist.unseen_total())
+        """Update the badge. Changes that arrive together (a catch-up, page by page) draw it once."""
+        if self._badge_queued:
+            return
+        self._badge_queued = True
+        self._on_main(self._draw_badge)
+
+    def _draw_badge(self) -> None:
+        self._badge_queued = False
+        self._main.set_badge(self.watchlist.unseen_total())
 
     # --- live matching: memory only, never a request -----------------------------------------------------------------
 
@@ -348,8 +372,8 @@ class WikihoseApp(App[None]):
         self._report_catch_up(what, result)
 
     def _report_catch_up(self, what: str, result: CatchUpResult) -> None:
-        for edit in reversed(result.edits):  # newest first within a page, so the last write is the newest
-            self._editors[(edit.wiki, edit.page_id)] = edit.user
+        for edit in result.edits:  # newest first within a page; an editor seen live this run is newer still
+            self._editors.setdefault((edit.wiki, edit.page_id), edit.user)
         changed = len({(edit.wiki, edit.page_id) for edit in result.edits})
         if changed:
             text = f"{changed} of {what} changed while you were away."
@@ -402,6 +426,10 @@ class WikihoseApp(App[None]):
             result = await self.watchlist.add(wiki, title)
         except WatchError as exc:
             self.notify(str(exc), severity="warning", timeout=6, markup=False)
+            return
+        except Exception:  # an odd answer or a database error must cost this add, not the app
+            log.exception("adding a page failed")
+            self.notify(f"Could not watch {shown}. Try again later.", severity="warning", timeout=6, markup=False)
             return
         name = result.page.title
         if result.already_watched:

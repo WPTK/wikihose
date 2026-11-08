@@ -51,6 +51,7 @@ class Watchlist:
         self._client = client
         self._clock = clock
         self._listeners: list[Callable[[], None]] = []
+        self._member_listeners: list[Callable[[], None]] = []
         self._pages: dict[tuple[str, int], WatchedPage] = {}
         self._titles: dict[tuple[str, str], int] = {}  # (wiki, normalized title) -> page ID
         for page in store.watched_pages():
@@ -59,6 +60,10 @@ class Watchlist:
     def subscribe(self, listener: Callable[[], None]) -> None:
         """Call ``listener`` after every change to the list or to a page's counts."""
         self._listeners.append(listener)
+
+    def subscribe_members(self, listener: Callable[[], None]) -> None:
+        """Call ``listener`` only when a page is added or removed or a title changes (not for counts)."""
+        self._member_listeners.append(listener)
 
     def __contains__(self, page: object) -> bool:
         """``(wiki, title) in watchlist``, from memory."""
@@ -137,7 +142,7 @@ class Watchlist:
         self._store.remove_watch(page.wiki, page.page_id)
         del self._pages[(page.wiki, page.page_id)]
         self._drop_title(current)
-        self._changed()
+        self._changed(members=True)
         return True
 
     # --- live changes ------------------------------------------------------------------------------------------------
@@ -200,14 +205,19 @@ class Watchlist:
             del self._titles[key]
 
     def _put(self, page: WatchedPage) -> WatchedPage:
+        key = page_key(page.wiki, page.title)
+        members = self._titles.get(key) != page.page_id
         self._pages[(page.wiki, page.page_id)] = page
-        self._titles[page_key(page.wiki, page.title)] = page.page_id
-        self._changed()
+        self._titles[key] = page.page_id
+        self._changed(members=members)
         return page
 
-    def _changed(self) -> None:
+    def _changed(self, *, members: bool = False) -> None:
         for listener in list(self._listeners):
             listener()
+        if members:
+            for listener in list(self._member_listeners):
+                listener()
 
     def _save(self, page: WatchedPage) -> WatchedPage:
         self._store.set_watch_state(
