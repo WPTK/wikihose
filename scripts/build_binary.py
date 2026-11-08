@@ -9,8 +9,13 @@ Usage, from the repository root, in an environment with the package, tzdata and 
 
 Output: dist/wikihose (dist/wikihose.exe on Windows); work files in .pyi-build/. Both are gitignored.
 The binary must pass --version, --selftest and a five-second headless demo before the script succeeds.
+
+CI runs the two halves apart, because the shared build workflow (WPTK/release-workflows) builds, then smoke-tests:
+    python scripts/build_binary.py --no-smoke     only build
+    python scripts/build_binary.py --smoke-only   only run the built binary through SMOKE_TESTS
 """
 
+import argparse
 import hashlib
 import subprocess
 import sys
@@ -64,14 +69,27 @@ SMOKE_TESTS = [
 ]
 
 
-def main() -> int:
-    subprocess.run(PYINSTALLER, cwd=ROOT, check=True)
+def smoke() -> int:
     for args in SMOKE_TESTS:
         print(f"$ {EXE.name} {' '.join(args)}", flush=True)
         if subprocess.run([str(EXE), *args], cwd=ROOT).returncode != 0:
             print(f"{' '.join(args)} failed: the frozen app is missing something", file=sys.stderr)
             return 1
-    print(f"{hashlib.sha256(EXE.read_bytes()).hexdigest()}  {EXE.name}")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--no-smoke", action="store_true", help="build only")
+    group.add_argument("--smoke-only", action="store_true", help="run the already built binary through the smoke tests")
+    args = parser.parse_args()
+    if not args.smoke_only:
+        subprocess.run(PYINSTALLER, cwd=ROOT, check=True)
+    if not args.no_smoke and smoke() != 0:
+        return 1
+    if not args.smoke_only:
+        print(f"{hashlib.sha256(EXE.read_bytes()).hexdigest()}  {EXE.name}")
     return 0
 
 
