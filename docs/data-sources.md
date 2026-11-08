@@ -35,7 +35,8 @@ Checked live on 7 Nov 2026 (re-verified that day with slow requests). Wikimedia 
 
 `https://stream.wikimedia.org/v2/stream/recentchange,mediawiki.page_change.v1` returned 200, and both kinds of event
 arrived on the one connection (about 207 and 114 in 6 seconds). Tell them apart by `$schema`, or by the presence of
-`page_change_kind`. 
+`page_change_kind`.
+
 ### Decision (Session 1, 7 Nov 2026)
 
 The app opens one connection to `recentchange` only. In a two-minute recording of the combined connection (7,398
