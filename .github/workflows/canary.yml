@@ -1,0 +1,117 @@
+name: Feed canary
+
+# Daily check that the live Wikimedia feeds still parse. Catches silent format drift before users do. The spot check
+# fetches every endpoint wikihose uses once, with the wikihose User-Agent and a pause between requests, and runs it
+# through the real namespace filter. The script exits 0 (all fine), 1 (a format or parse failure: lines starting FAIL)
+# or 2 (only outages: a feed down, throttled or empty: lines starting DOWN).
+#   Format failure: opens one issue labelled feed-drift, or comments on the one already open, straight away.
+#   Outage only:    a feed being down for a day is not a format change. The run still ends red so the history shows it,
+#                   but an issue (label feed-down, same one-issue rule) is raised only when the two runs before this one
+#                   failed too, so after three days in a row.
+# This workflow is scheduled or started by hand only, never from pull requests. GitHub disables scheduled workflows
+# after 60 days without repository activity; if the daily run stops appearing, run it by hand (workflow_dispatch).
+
+on:
+  schedule:
+    - cron: "17 13 * * *" # daily 13:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: read # to read earlier runs of this workflow when counting repeated outages
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e .
+
+      - name: Spot check
+        id: check
+        run: |
+          set +e
+          python scripts/spot_check_feeds.py 2>&1 | tee "$RUNNER_TEMP/canary-feeds.txt"
+          rc="${PIPESTATUS[0]}"
+          set -e
+          # 0 fine, 2 outage only; anything other than 0 or 2 (a crash included) counts as a format failure.
+          [ "$rc" -eq 0 ] || [ "$rc" -eq 2 ] || rc=1
+          echo "code=$rc" >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether to raise
+        id: decide
+        if: steps.check.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODE: ${{ steps.check.outputs.code }}
+        run: |
+          if [ "$CODE" = 1 ]; then
+            echo "label=feed-drift" >> "$GITHUB_OUTPUT"
+            echo "title=Feed canary: a feed no longer parses" >> "$GITHUB_OUTPUT"
+            echo "raise=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "label=feed-down" >> "$GITHUB_OUTPUT"
+          echo "title=Feed canary: a feed has been down for days" >> "$GITHUB_OUTPUT"
+          # This run is still in progress, so the completed runs are the earlier ones, newest first. Only scheduled
+          # runs count and cancelled ones are skipped, so a manual rerun cannot advance the three-day clock.
+          bad="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow canary.yml --event schedule --status completed \
+            --limit 10 --json conclusion \
+            --jq '[.[] | select(.conclusion != "cancelled")][:2] | map(select(.conclusion != "success")) | length')"
+          echo "Earlier runs not successful (of the last 2 scheduled): $bad"
+          if [ "$bad" -ge 2 ]; then echo "raise=yes" >> "$GITHUB_OUTPUT"; else echo "raise=no" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Open or update the issue
+        if: steps.decide.outputs.raise == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LABEL: ${{ steps.decide.outputs.label }}
+          TITLE: ${{ steps.decide.outputs.title }}
+        run: |
+          {
+            if [ "$LABEL" = feed-down ]; then
+              echo "A feed has been down, unreachable or empty for at least three daily runs in a row. This is an outage, not a format change."
+            else
+              echo "A feed no longer parses the way wikihose expects."
+            fi
+            echo
+            for file in "$RUNNER_TEMP/canary-feeds.txt"; do
+              [ -f "$file" ] || continue
+              if grep -qE '^ *(FAIL|DOWN)|Traceback' "$file"; then
+                echo "From $(basename "$file") (matching lines):"
+                echo '```'
+                grep -E '^ *(FAIL|DOWN)|Traceback' "$file" | tail -n 40
+                echo '```'
+              fi
+              if grep -q '^Traceback' "$file"; then
+                echo "Last traceback in $(basename "$file") (final 40 lines):"
+                echo '```'
+                awk '/^Traceback/ { buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' "$file" | tail -n 40
+                echo '```'
+              fi
+            done
+            echo "Run: $RUN_URL"
+          } > "$RUNNER_TEMP/body.md"
+          gh label create "$LABEL" --color D93F0B --description "Wikimedia feed canary" 2>/dev/null || true
+          number="$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --label "$LABEL" --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+      - name: Fail the run when a check failed
+        if: steps.check.outputs.code != '0'
+        env:
+          CODE: ${{ steps.check.outputs.code }}
+        run: |
+          if [ "$CODE" = 2 ]; then echo "::warning::Only outages (feed down or empty); no format change seen."; fi
+          exit 1
