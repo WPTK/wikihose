@@ -16,6 +16,7 @@ from wikihose.clock import VirtualClock
 from wikihose.config import Config, is_valid_wiki
 from wikihose.sources.events import Edit, clean_text, parse_recentchange
 from wikihose.sources.replay import ReplaySource
+from wikihose.store import Store
 from wikihose.titles import article_url, valid_host
 from wikihose.ui.dialogs import EditDetail
 from wikihose.ui.tabs.live import FilterLine
@@ -56,16 +57,40 @@ def parsed(**changes: Any) -> Edit:
     ("text", "clean"),
     [
         ("plain", "plain"),
-        ("a\x1b[2Jb", "a�[2Jb"),
-        ("a\x00b\x07c\x7fd\x9be", "a�b�c�d�e"),
-        ("line\nbreak\r", "line�break�"),
+        ("a\x1b[2Jb", "a\ufffd[2Jb"),
+        ("a\x00b\x07c\x7fd\x9be", "a\ufffdb\ufffdc\ufffdd\ufffde"),
+        ("line\nbreak\r", "line\ufffdbreak\ufffd"),
         ("tab\there", "tab here"),
-        ("a‮b‪c⁦d⁩e", "abcde"),
-        ("né 日本語 ✓", "né 日本語 ✓"),
+        ("a\u202eb\u202ac\u2066d\u2069e", "abcde"),
+        ("a\ud800b\udfffc\udbffd", "a\ufffdb\ufffdc\ufffdd"),  # lone surrogates
+        ("a\u2028b\u2029c", "a\ufffdb\ufffdc"),
+        ("a\u200eb\u200fc\u061cd", "abcd"),
+        ("a\u200bb\u2060c\ufeffd", "abcd"),
+        ("a\u206ab\u206fc\ufff9d\ufffbe", "abcde"),
+        (
+            "\U0001f468\u200d\U0001f469 \u0915\u094d\u200c\u0937",
+            "\U0001f468\u200d\U0001f469 \u0915\u094d\u200c\u0937",
+        ),  # ZWJ and ZWNJ stay
+        ("n\u00e9 \u65e5\u672c\u8a9e \u2713", "n\u00e9 \u65e5\u672c\u8a9e \u2713"),
     ],
 )
 def test_clean_text(text: str, clean: str) -> None:
     assert clean_text(text) == clean
+
+
+def test_a_lone_surrogate_in_the_json_is_cleaned_and_the_store_takes_the_edit(tmp_path: Path) -> None:
+    raw = '{"type":"edit","namespace":0,"title":"T\\ud800x","comment":"c\\udfff","timestamp":1794098367,"user":"U\\ud83d",'
+    raw += '"bot":false,"length":{"old":1,"new":2},"server_name":"en.wikipedia.org","wiki":"enwiki"}'
+    edit = parse_recentchange(raw)
+    assert isinstance(edit, Edit)
+    assert edit.title == "T\ufffdx"
+    assert edit.comment == "c\ufffd"
+    assert edit.user == "U\ufffd"
+    for text in (edit.title, edit.comment, edit.user):
+        text.encode("utf-8")  # would raise on a surrogate
+    store = Store(tmp_path / "t.db")
+    store.add_edit_minute(edit.wiki, edit.title, "2026-11-07T14:05")
+    store.close()
 
 
 def test_a_parsed_edit_has_clean_user_title_comment_and_wiki() -> None:
@@ -195,7 +220,15 @@ def test_the_wiki_flag_refuses_bad_names(name: str) -> None:
 # --- the log keeps its scroll position -------------------------------------------------------------------------------
 
 
-async def test_new_edits_do_not_move_the_scroll_position(clock: VirtualClock) -> None:
+def row_keys(table: DataTable) -> list[str]:
+    return [str(row.key.value) for row in table.ordered_rows]
+
+
+def first_visible_key(table: DataTable) -> str:
+    return row_keys(table)[int(table.scroll_y)]
+
+
+async def test_new_edits_keep_the_reader_on_the_same_rows(clock: VirtualClock) -> None:
     edits = [make_edit(f"Page {n}") for n in range(200)]
     app = make_app(ListSource(clock, edits), clock)
     async with app.run_test(size=(100, 30)) as pilot:
@@ -203,17 +236,55 @@ async def test_new_edits_do_not_move_the_scroll_position(clock: VirtualClock) ->
         table = app.query_one("#log", DataTable)
         table.scroll_to(y=40, animate=False, immediate=True)
         await pilot.pause()
-        assert table.scroll_y == 40
-        keep = tab.row_titles()[45]
         table.move_cursor(row=45, animate=False, scroll=False)
+        first, cursor = first_visible_key(table), row_keys(table)[45]
+        assert table.scroll_y == 40
+
+        def no_clear(*args: object, **kwargs: object) -> None:
+            raise AssertionError("the log was cleared and rebuilt by an ordinary flush")
+
+        table.clear = no_clear  # type: ignore[method-assign]
         for n in range(5):
             tab.accept(make_edit(f"New {n}"))
         tab.flush_log()
         await pilot.pause()
         await pilot.pause()
-        assert table.scroll_y == 40
-        assert tab.row_titles()[0] == "New 4"
-        assert tab.row_titles()[table.cursor_row] == keep
+        assert row_keys(table)[0] != first  # the five new rows went in at the top
+        assert tab.row_titles()[:5] == [f"New {n}" for n in (4, 3, 2, 1, 0)]
+        assert first_visible_key(table) == first  # the same rows are in view
+        assert row_keys(table)[table.cursor_row] == cursor  # the cursor is still on its row
+        height = table.scrollable_content_region.height
+        assert int(table.scroll_y) <= table.cursor_row < int(table.scroll_y) + height  # and on screen
+
+
+async def test_the_log_stays_in_order_and_at_500_rows_when_rows_are_added(clock: VirtualClock) -> None:
+    app = make_app(ListSource(clock, [make_edit(f"Page {n}") for n in range(498)]), clock)
+    async with app.run_test(size=(100, 30)) as pilot:
+        tab = await settle(app, pilot)
+        table = app.query_one("#log", DataTable)
+        for batch in range(3):
+            for n in range(4):
+                tab.accept(make_edit(f"B{batch}-{n}"))
+            tab.flush_log()
+            await pilot.pause()
+        assert table.row_count == 500
+        assert row_keys(table) == [key for key, _ in tab._rows]  # the table and the log agree, newest first
+        assert tab.row_titles()[:4] == ["B2-3", "B2-2", "B2-1", "B2-0"]
+        assert tab.row_titles()[-1] == "Page 10"  # the 10 oldest are gone
+        assert set(tab._edits) == set(row_keys(table))
+
+
+async def test_at_the_top_the_log_follows_the_newest_edit(clock: VirtualClock) -> None:
+    app = make_app(ListSource(clock, [make_edit("Old")]), clock)
+    async with app.run_test(size=(100, 30)) as pilot:
+        tab = await settle(app, pilot)
+        table = app.query_one("#log", DataTable)
+        tab.accept(make_edit("Newer"))
+        tab.flush_log()
+        await pilot.pause()
+        assert table.cursor_row == 0
+        assert table.scroll_y == 0
+        assert tab.row_titles()[0] == "Newer"
 
 
 # --- a burst of events does not starve the loop ----------------------------------------------------------------------

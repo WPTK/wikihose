@@ -97,16 +97,19 @@ def _int(value: Any, *, optional: bool = False) -> int | None:
     return value
 
 
-# Text from the stream is written by strangers and ends up on a terminal, so it is cleaned once, here. Control
-# characters (which could start an escape sequence) become U+FFFD, a tab becomes a space, and the characters that
-# reorder text (bidirectional overrides and isolates) are dropped.
-_CONTROL = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f]")
-_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069]")
+# Text from the stream is written by strangers and ends up on a terminal and in a database, so it is cleaned once,
+# here. These become U+FFFD: control characters (which could start an escape sequence), line and paragraph separators,
+# and lone surrogates (which sqlite and stdout cannot encode). A tab becomes a space. These are dropped: the
+# characters that reorder or hide text (bidirectional marks, overrides and isolates, zero-width spaces, the word
+# joiner, the byte order mark, the deprecated format controls and the interlinear annotation marks).
+# U+200D and U+200C stay, since many scripts and emoji need them.
+_REPLACE = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]")
+_DROP = re.compile("[\u202a-\u202e\u2066-\u2069\u200e\u200f\u061c\u200b\u2060\ufeff\u206a-\u206f\ufff9-\ufffb]")
 
 
 def clean_text(text: str) -> str:
     """``text`` with control and bidirectional characters removed or replaced, as described above."""
-    return _CONTROL.sub("\ufffd", _BIDI.sub("", text.replace("\t", " ")))
+    return _REPLACE.sub("\ufffd", _DROP.sub("", text.replace("\t", " ")))
 
 
 def _str(value: Any, default: str | None = None) -> str:

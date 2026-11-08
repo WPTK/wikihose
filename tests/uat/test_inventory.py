@@ -101,8 +101,16 @@ def _ui_classes() -> list[type]:
     return list(found.values())
 
 
+CLICKS = r"pilot\.click\(|click_footer\(|@click|Picked\("
+
+
+def _quoted(word: str) -> str:
+    """A pattern for ``word`` as a whole string literal, so that "b" does not match every test that has a b in it."""
+    return rf"""["']{re.escape(word)}["']"""
+
+
 def collected() -> dict[str, list[str]]:
-    """Every input, with the words a test for it must contain (a key name, a label, or a click word)."""
+    """Every input, with the patterns a test for it must match (a quoted key or label, help text, or a click)."""
     found: dict[str, list[str]] = {}
     for cls in _ui_classes():
         for binding in _own_bindings(cls):
@@ -111,20 +119,21 @@ def collected() -> dict[str, list[str]]:
         for binding in declared_bindings(cls):
             if binding.show:
                 mode = "replay" if binding.action.startswith("replay_") else "live"
-                found[f"footer:{mode}:{binding.description}"] = [binding.description]
+                found[f"footer:{mode}:{binding.description}"] = [_quoted(binding.description)]
             if not binding.action.startswith("tab("):
-                found[f"help:{key_label(binding)}"] = [*_key_words(binding), binding.tooltip or binding.description]
+                text = re.escape(binding.tooltip or binding.description)
+                found[f"help:{key_label(binding)}"] = [*_key_words(binding), text]
     for key, text in FIXED_HELP:
-        found[f"help:{key}"] = ["click"] if key == "Mouse" else [key.lower(), text]
+        found[f"help:{key}"] = [CLICKS] if key == "Mouse" else [_quoted(key), _quoted(key.lower()), re.escape(text)]
     for path in (ROOT / "src" / "wikihose").rglob("*.py"):
         for action in re.findall(r"@click=(\w+)", path.read_text(encoding="utf-8")):
-            found[f"click:{action}"] = ["click"]
+            found[f"click:{action}"] = [CLICKS]
     return found
 
 
 def _key_words(binding: Binding) -> list[str]:
-    """What a test calls the key: Textual's key name, the character shown for it, or the action it runs."""
-    return [binding.key, binding.key_display or binding.key, binding.action.split("(")[0]]
+    """What a test calls the key: Textual's key name or the character shown for it, as a quoted string."""
+    return [_quoted(binding.key), _quoted(binding.key_display or binding.key)]
 
 
 def source_of_tests() -> dict[str, str]:
@@ -136,7 +145,9 @@ def source_of_tests() -> dict[str, str]:
         for node in ast.walk(ast.parse(text)):
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith("test_"):
                 first = min([node.lineno, *(d.lineno for d in node.decorator_list)])  # the decorators name the cases
-                found[node.name] = found.get(node.name, "") + " ".join(lines[first - 1 : node.end_lineno])
+                # the decorators (they name the cases) and the body, but not the ``def`` line, which holds the name
+                kept = lines[first - 1 : node.lineno - 1] + lines[node.body[0].lineno - 1 : node.end_lineno]
+                found[node.name] = found.get(node.name, "") + "\n".join(kept)
     return found
 
 
@@ -160,13 +171,16 @@ def test_every_entry_names_a_real_test() -> None:
 
 
 def test_every_named_test_mentions_its_input() -> None:
-    """A test named for a key must contain that key (or its label, or its help text), so a rename cannot hollow it out."""
+    """A test listed for an input must contain it: the key or label as a quoted string, the help text, or a click.
+
+    The ``def`` line is left out of the search, since a test's name often repeats the word.
+    """
     tests = source_of_tests()
     found = collected()
     hollow = []
     for key, name in INVENTORY.items():
         if name.startswith("manual:") or key not in found or name not in tests:
             continue
-        if not any(word in tests[name] for word in found[key]):
-            hollow.append(f"{key} -> {name} (looked for any of {found[key]})")
+        if not any(re.search(pattern, tests[name]) for pattern in found[key]):
+            hollow.append(f"{key} -> {name}")
     assert not hollow, "tests that never mention the input they are listed for: " + "; ".join(sorted(hollow))

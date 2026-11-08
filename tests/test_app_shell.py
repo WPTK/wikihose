@@ -572,7 +572,10 @@ async def click_footer(pilot, app, label: str) -> None:
         if steady >= 3:
             break
         await pilot.pause()
-    key = next(k for k in keys if label in str(k.render()))
+    else:
+        raise AssertionError(f"the footer never stopped changing while waiting to click {label!r}")
+    key = next((k for k in keys if label in str(k.render())), None)
+    assert key is not None, f"no footer key labelled {label!r}; the footer shows {footer_text(keys)!r}"
     await pilot.click(key)
     await pilot.pause()
 
