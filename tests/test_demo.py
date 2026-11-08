@@ -12,7 +12,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
-from support import live_tab, make_app, wait_for_stream
+from support import footer_keys, footer_text, live_tab, make_app, wait_for_stream
 
 from wikihose.cli import main
 from wikihose.clock import VirtualClock
@@ -237,7 +237,7 @@ async def test_the_demo_does_not_offer_or_allow_a_wiki_change(clock: VirtualCloc
     app = make_app(source, clock, loop_replay=True)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        footer = " ".join(str(key.render()) for key in app.query("FooterKey"))
+        footer = footer_text(await footer_keys(pilot, app, needing="Bots"))
         assert "Wiki" not in footer
         assert "Bots" in footer
         await pilot.press("i")
