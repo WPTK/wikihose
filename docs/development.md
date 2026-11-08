@@ -45,7 +45,16 @@ on the demo to prove the data path end to end.
 
 `scripts/capture_demo.py` remakes `docs/images/demo.svg`, the README picture: the Live tab five minutes into the demo,
 120x30, dark theme, New York time. Run it after a visual change to the Live tab (with `NO_COLOR` unset) and read the
-result; a test fails when the committed picture is out of date.
+result; a test fails when the committed picture is out of date. The test suite clears `NO_COLOR` itself; the script
+does not, and refuses to run while it is set.
+
+For floor-size screenshots in a UAT, the script takes `--size WxH`, `--tab N` (press the number key of tab 1 to 5
+before capturing) and `--out PATH`. The defaults (120x30, no tab key, `docs/images/demo.svg`) make the README picture, so
+write other captures outside the repo:
+
+```powershell
+.venv\Scripts\python scripts\capture_demo.py --size 80x24 --tab 2 --out uat-80x24-reading.svg
+```
 
 ## CI gates
 
