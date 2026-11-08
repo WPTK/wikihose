@@ -1,0 +1,31 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, the output you got, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnose
+    attributes:
+      label: Diagnostics
+      description: Output of `wikihose --diagnose`, if the app starts. Check it for anything you do not want to share.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `wikihose --version`, or the commit if running from source.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system, terminal and Python version
+      placeholder: Windows 11, Windows Terminal, Python 3.12.10
+    validations:
+      required: true

@@ -1,0 +1,75 @@
+# Design
+
+wikihose is a terminal dashboard for watching Wikipedia live: what people are editing now, what people are suddenly
+reading, where the two overlap, and edits to pages you choose to track. Python 3.12+ and Textual, pinned
+`textual>=8.2,<9` (dev: `textual==8.2.8`). Installed with `pipx` from PyPI or as a GitHub release binary.
+
+This file is the target. Session 1 starts with a design pass that may change the shell layout; record any change here.
+
+## Tabs
+
+1. **Live.** A scrolling edit log with +/- bytes, an edits-per-minute sparkline, top-edited articles over the last 15
+   minutes, and the bot vs human ratio. Filters: wiki, hide bots, articles only, minimum byte change.
+2. **Reading.** Daily spike rankings. Spike = today's views divided by the article's 30-day median. Columns: article,
+   views, baseline, spike multiple, 30-day sparkline. A detail pane shows the article summary.
+3. **Watchlist.** Pages you track.
+   - Add one with `w` on any article row in any tab, or by typing a title or pasting a Wikipedia URL.
+   - While the app runs, match live edits against the list with no extra requests, highlight matches and badge the tab.
+   - On startup, catch up on edits made while the app was closed.
+   - Each page has a 30-day pageview sparkline.
+4. **Diff.** Enter on a tracked edit shows a red/green terminal diff.
+5. **Convergence.** Articles hot in both Live and Reading, ranked by edit velocity times spike multiple.
+   - Surge trigger: when an article passes an edit-rate threshold (start at 10 human edits in 15 minutes), fetch its
+     pageview history automatically.
+   - Label it "live edits vs. the last full day of reading".
+6. **Later, maybe.** Near-real-time reading data from Wikimedia's hourly pageview dumps.
+
+Non-goals: no logins or accounts, no editing Wikipedia, no notifications outside the terminal, no AI summaries, no views
+that follow one editor across edits.
+
+## Run modes
+
+`--demo` (a bundled recording that works with no network), `--record <file>`, `--replay <file>` (pause, speed and skip
+keys), `--offline` (saved data only), `--version`, `--selftest`, `--diagnose`, `--debug`, `--no-config`.
+
+## Architecture
+
+- One shared network client handles the User-Agent, gzip, timeouts, the request budget, `stamina` retries and the
+  `hishel` cache (see earthwave's `net.py`).
+- Every feed sits behind one `DataSource` interface with a live source and a replay source, so the rest of the app can't
+  tell them apart (the eyewall pattern). Time comes from an injectable clock, never `sleep`.
+- The stream runs in a Textual worker, and the UI never waits on the network. Keep rolling aggregates in memory, never
+  every event, and cap the on-screen log.
+- SQLite, keyed on `(wiki, page)`. Tables: pageview history and baselines, the watchlist (page ID plus last known
+  title), the last-seen revision per watched page, and rolling edit aggregates. Normalize titles: spaces vs underscores,
+  and first-letter case per wiki.
+- Paths come from `platformdirs`, with env var overrides `WIKIHOSE_CONFIG_DIR` and `WIKIHOSE_DATA_DIR` (earthwave's
+  `paths.py`).
+- Package layout: `src/wikihose/` (the eyewall layout).
+- Terminal size: set a minimum, with a "make the window bigger" message that clears on resize. Test sizes: the floor
+  (80x24 unless the design argues otherwise), 120x30 (the Windows Terminal default), 160x48 and 240x60.
+- Feed health names each failing feed, says why (down, rate limited, bad data) and clears on recovery.
+- `?` help lists only real bindings. The mouse works on rows, tabs, the footer and buttons.
+- The UI uses plain words.
+- Panes that show Wikipedia text link to the article, for CC BY-SA attribution.
+- The README and `--help` say the app is unofficial and not affiliated with the Wikimedia Foundation.
+- User-facing text describes this app as it is, with no comparisons to other tools.
+
+## Colors
+
+- Orange is allowed for text, borders, underlines, sparkline marks and small icons. It is never the primary color and
+  never a background.
+- A background is any filled area: the screen, panels, table rows, selection and cursor highlights, buttons, badges and
+  toasts.
+- Textual fills some widgets with theme colors. In a check on 7 Nov 2026, the default `textual-dark` theme (accent and
+  warning both `#ffa62b`) drew a `variant="warning"` button with an orange background, `#fca834`.
+- Ship our own dark and light themes. Their `primary`, `background`, `surface`, `panel` and `warning` are not orange.
+  Offer a built-in theme only if snapshots of the main screens in it pass the SVG test below.
+- In these tests, "orange" means a hue between 15 and 45 degrees, saturation above 35% and lightness between 20% and
+  85%. Adapt wxbrief's `scripts/svgcolour.py` for the color math.
+- Tests:
+  - Every offered theme's `primary`, `background`, `surface`, `panel` and `warning` are not orange.
+  - No snapshot or docs SVG has an orange `<rect>` fill. Textual's exporter draws backgrounds as
+    `<rect fill="#...">` and text as CSS `fill:` classes, so orange text passes. The window's title-bar dots are
+    `<circle>` elements and don't count.
+  - A grep test fails on Rich markup that puts orange behind text, such as `on orange` or `on dark_orange`.
