@@ -35,7 +35,19 @@ Checked live on 7 Nov 2026 (re-verified that day with slow requests). Wikimedia 
 
 `https://stream.wikimedia.org/v2/stream/recentchange,mediawiki.page_change.v1` returned 200, and both kinds of event
 arrived on the one connection (about 207 and 114 in 6 seconds). Tell them apart by `$schema`, or by the presence of
-`page_change_kind`. Session 1 decides which stream feeds Live and Watchlist, or both on one connection.
+`page_change_kind`. 
+### Decision (Session 1, 7 Nov 2026)
+
+The app opens one connection to `recentchange` only. In a two-minute recording of the combined connection (7,398
+events), `mediawiki.page_change.v1` was 57% of the bytes for data recentchange already carries.
+
+- Live reads edit and new events.
+- The Watchlist gets each page's ID from the Action API (`prop=info`) when it is added, and matches live edits by
+  (wiki, normalized title).
+- It follows renames through recentchange `log` events with `log_type: move` (`log_params.target` holds the new title),
+  and catches up by page ID through the Action API.
+- If that proves unreliable, adding `mediawiki.page_change.v1` to the same connection is a one-line change to the
+  stream URL.
 
 ## Pageviews
 

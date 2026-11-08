@@ -22,10 +22,28 @@ This file is the target. Session 1 starts with a design pass that may change the
    - Surge trigger: when an article passes an edit-rate threshold (start at 10 human edits in 15 minutes), fetch its
      pageview history automatically.
    - Label it "live edits vs. the last full day of reading".
-6. **Later, maybe.** Near-real-time reading data from Wikimedia's hourly pageview dumps.
+6. **Hourly** (later, maybe): near-real-time reading data from Wikimedia's hourly pageview dumps. Left out of the app
+   until it is built (owner, 7 Nov 2026).
 
 Non-goals: no logins or accounts, no editing Wikipedia, no notifications outside the terminal, no AI summaries, no views
 that follow one editor across edits.
+
+## Shell layout (chosen 7 Nov 2026)
+
+- Layout A: a tab strip across the top (Live, Reading, Watchlist, Diff, Convergence; keys 1-5 or a click), full-width
+  content, and the key footer at the bottom. Every footer key is clickable. The Watchlist tab label carries a count
+  badge. A one-line top bar names the app, the wiki and the local time.
+- Layout B (a left rail holding navigation, feed health and the live numbers) was mocked up too and rejected: it costs
+  24 columns on every tab, which Reading and Diff can't spare at 80x24.
+- Feed health has no always-on line. While a feed is failing, a one-line bar above the footer names the feed and why
+  ("Stream: reconnecting in 8s", "Pageviews: rate limited, retrying in 12s"), and it clears on recovery. Full feed
+  status belongs in a later settings or `--diagnose` view (owner's choice).
+- Floor size: 80x24.
+- Live opens showing articles only with bots hidden. One key toggles each. The people/bots split always counts both
+  (owner's choice).
+- At 80 columns the Live log shows time, bytes and article, with a right-hand column holding the edits-per-minute
+  sparkline, the people/bots split and the most edited articles in the last 15 minutes. The editor column appears from
+  about 105 columns and the edit summary from about 145. Nothing scrolls sideways.
 
 ## Run modes
 
@@ -47,7 +65,7 @@ keys), `--offline` (saved data only), `--version`, `--selftest`, `--diagnose`, `
   `paths.py`).
 - Package layout: `src/wikihose/` (the eyewall layout).
 - Terminal size: set a minimum, with a "make the window bigger" message that clears on resize. Test sizes: the floor
-  (80x24 unless the design argues otherwise), 120x30 (the Windows Terminal default), 160x48 and 240x60.
+  (80x24), 120x30 (the Windows Terminal default), 160x48 and 240x60.
 - Feed health names each failing feed, says why (down, rate limited, bad data) and clears on recovery.
 - `?` help lists only real bindings. The mouse works on rows, tabs, the footer and buttons.
 - The UI uses plain words.
