@@ -3,7 +3,7 @@
 This file follows [Common Changelog](https://common-changelog.org/), with a [gitmoji](https://gitmoji.dev) prefix on each
 entry. Versions follow [ZeroVer](https://0ver.org).
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-11-08
 
 _Known issue: the Live log can show rows slightly out of time order, as the feed sends them (#27)._
 
