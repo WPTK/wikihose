@@ -326,8 +326,10 @@ class WikihoseApp(App[None]):
         self._on_main(self._draw_badge)
 
     def _draw_badge(self) -> None:
-        self._badge_queued = False
-        self._main.set_badge(self.watchlist.unseen_total())
+        try:
+            self._main.set_badge(self.watchlist.unseen_total())
+        finally:
+            self._badge_queued = False
 
     # --- live matching: memory only, never a request -----------------------------------------------------------------
 

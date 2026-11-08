@@ -139,13 +139,16 @@ async def _check_page(
         return  # nothing since the newest revision already known
     baseline = now.last_rev_id
     revisions = await _history(client, now, cutoff, baseline)
-    if watchlist.current(now) is None:
+    if (current := watchlist.current(now)) is None:
         return
-    edits = _edits(now, revisions, baseline)
+    # Live edits that arrived during the request are already counted: only revisions newer than those are new here.
+    counted_live = current.last_rev_id > baseline
+    edits = _edits(now, revisions, max(baseline, current.last_rev_id))
     result.edits.extend(edits)
     watchlist.absorb(
         now,
-        unseen=max(len(edits), 1),  # the page changed even if every change is older than the look-back
+        # The page changed even if every change is older than the look-back, unless the live stream counted them all.
+        unseen=len(edits) if edits or counted_live else 1,
         last_rev_id=max(latest, edits[0].rev_id if edits else 0),
         last_edit_at=edits[0].at if edits else None,
     )

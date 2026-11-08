@@ -7,6 +7,7 @@ features that use them: edit minutes and the watchlist so far.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
@@ -46,6 +47,8 @@ SCHEMA_V2 = [
 ]
 
 MIGRATIONS: list[list[str]] = [SCHEMA_V1, SCHEMA_V2]
+log = logging.getLogger(__name__)
+
 SCHEMA_VERSION = len(MIGRATIONS)
 
 _WATCH_COLUMNS = (
@@ -65,6 +68,28 @@ class WatchedPage:
     seen_rev_id: int  # the revision the reader last looked at
     last_edit_at: datetime | None
     deleted: bool  # the wiki no longer has the page
+
+
+def read_saved_watchlist(path: Path) -> list[WatchedPage]:
+    """The watched pages in the database at ``path``, read without writing: no migration and no
+    journal or lock files. It opens the file as an immutable snapshot, so a wikihose writing at that moment can be read
+    half-way, which only costs an empty list.
+
+    A replay uses this to match live edits against the reader's list. Anything wrong with the file (missing, corrupt,
+    written by a newer wikihose, or an older schema without the watchlist columns) gives an empty list.
+    """
+    try:
+        db = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro&immutable=1", uri=True)
+    except (sqlite3.Error, OSError, ValueError):
+        return []
+    try:
+        rows = db.execute(f"SELECT {_WATCH_COLUMNS} {_WATCH_FROM} ORDER BY w.added_at, w.wiki, w.page_id")
+        return [_watched(row) for row in rows]
+    except (sqlite3.Error, ValueError, TypeError):
+        log.warning("could not read the saved watchlist from %s", path, exc_info=True)
+        return []
+    finally:
+        db.close()
 
 
 def _watched(row: tuple[Any, ...]) -> WatchedPage:

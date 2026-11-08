@@ -500,7 +500,8 @@ async def test_the_catch_up_does_not_block_startup_and_is_cancelled_on_quit(
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
         await asyncio.wait_for(started.wait(), 5)
-        assert (worker := next(w for w in app.workers if w.name == "catch-up")) is not None
+        worker = next(w for w in app.workers if w.name == "catch-up")
+        assert worker.is_running
         assert app.is_running and source.ended  # the stream ran while the check was still waiting
         await pilot.press("q")
     assert not app.is_running
@@ -820,7 +821,10 @@ async def test_a_stream_that_finishes_as_the_app_shuts_down_does_not_fail_a_work
         app = make_app(source, clock, store=store)
         async with app.run_test(size=SIZE) as pilot:
             await pilot.pause()
-            source.gate.set()  # the stream's last items arrive in the same breath as the quit
+            assert any(w.name == "stream" and w.is_running for w in app.workers)  # still waiting on the gate
+            asyncio.get_running_loop().call_soon(
+                source.gate.set
+            )  # the last items arrive in the same breath as the quit
             await pilot.press("q")
         assert not app.is_running  # run_test would have raised if the stream worker had failed
 

@@ -107,16 +107,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _saved_watchlist() -> list[WatchedPage]:
     """The reader's watched pages for a replay, which gets them read-only. Nothing when there is no database yet."""
-    from wikihose.store import Store
+    from wikihose.store import read_saved_watchlist
 
     path = db_path()
-    if not path.exists():
-        return []
-    saved = Store(path)
-    try:
-        return list(saved.watched_pages())
-    finally:
-        saved.close()
+    return read_saved_watchlist(path) if path.exists() else []
 
 
 def reading_factory(client: Client | None, clock: Clock) -> Factory | None:

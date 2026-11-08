@@ -367,3 +367,51 @@ async def test_hidden_users_and_comments_are_not_shown(store: Store, client: Cli
 
 def test_the_lookback_is_thirty_days() -> None:
     assert timedelta(days=30) == LOOKBACK
+
+
+def _revision(clock: VirtualClock, rev: int, parent: int, size: int) -> dict[str, Any]:
+    return {
+        "revid": rev,
+        "parentid": parent,
+        "timestamp": clock.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "user": "Someone",
+        "comment": "",
+        "size": size,
+    }
+
+
+@respx.mock
+async def test_a_live_edit_that_arrives_during_the_history_request_counts_once(
+    store: Store, client: Client, clock: VirtualClock
+) -> None:
+    watch(store, clock, "enwiki", 974, "Page 974", 100)
+    watchlist = Watchlist(store, client, clock)
+
+    def history(request: httpx.Request) -> httpx.Response:
+        watchlist.record_edit(make_edit(title="Page 974", rev_new=101))  # the stream gets 101 while we wait
+        revisions = [_revision(clock, 102, 101, 30), _revision(clock, 101, 100, 20)]
+        return httpx.Response(200, json={"query": {"pages": [{"pageid": 974, "revisions": revisions}]}})
+
+    respx.get(EN).mock(side_effect=Wiki({974: action_page(974, "Page 974", 102)}, history))
+    result = await catch_up(watchlist, client, clock)
+    page = watchlist.match("enwiki", "Page 974")
+    assert page is not None and (page.unseen, page.last_rev_id) == (2, 102)
+    assert [edit.rev_id for edit in result.edits] == [102]
+
+
+@respx.mock
+async def test_nothing_is_added_when_the_live_stream_already_counted_every_new_revision(
+    store: Store, client: Client, clock: VirtualClock
+) -> None:
+    watch(store, clock, "enwiki", 974, "Page 974", 100)
+    watchlist = Watchlist(store, client, clock)
+
+    def history(request: httpx.Request) -> httpx.Response:
+        watchlist.record_edit(make_edit(title="Page 974", rev_new=101))
+        revisions = [_revision(clock, 101, 100, 20)]
+        return httpx.Response(200, json={"query": {"pages": [{"pageid": 974, "revisions": revisions}]}})
+
+    respx.get(EN).mock(side_effect=Wiki({974: action_page(974, "Page 974", 101)}, history))
+    await catch_up(watchlist, client, clock)
+    page = watchlist.match("enwiki", "Page 974")
+    assert page is not None and page.unseen == 1
