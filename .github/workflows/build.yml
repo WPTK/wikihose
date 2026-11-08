@@ -101,6 +101,14 @@ jobs:
       - name: Build, then run --version, --selftest and a headless demo on the result
         shell: bash
         run: python scripts/build_binary.py
+      # The floor is claimed in the README, so prove it: no symbol newer than glibc 2.31 may be needed.
+      - name: Check the glibc floor
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          newest=$(objdump -T dist/wikihose | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+          echo "newest glibc symbol needed: $newest"
+          [ "$(printf '%s\n' GLIBC_2.31 "$newest" | sort -V | tail -1)" = GLIBC_2.31 ] || { echo "::error::needs $newest, newer than the 2.31 floor"; exit 1; }
       - name: Name the file
         shell: bash
         env:
@@ -114,7 +122,7 @@ jobs:
             tar -C dist -czf "out/wikihose-$version-$NAME.tar.gz" wikihose
             listing=$(tar -tvzf "out/wikihose-$version-$NAME.tar.gz")
             echo "$listing"
-            case "$listing" in -rwx*) ;; *) echo "::error::the archive lost the executable bit"; exit 1 ;; esac
+            echo "$listing" | grep -Eq '^-rwx.* wikihose$' || { echo "::error::the archive lost the executable bit"; exit 1; }
           fi
           ls -l out
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

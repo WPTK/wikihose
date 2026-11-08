@@ -3,7 +3,8 @@ name: Post-release
 # Checks a published release the way a user would: installs the version from PyPI with pipx and runs each published
 # binary on a runner of its own kind (Windows, Linux and macOS, x86_64 and arm64), each in a clean runner, then runs
 # --version and --selftest. A failure means the release is
-# broken for users. It publishes nothing.
+# broken for users. It publishes nothing. It expects the six-binary release layout of 0.2.0 and later; a manual run
+# against v0.1.0 (Windows exe only) fails by design.
 #
 # Triggers: `release: published` fires for releases made by a person. The Release workflow creates its release with
 # GITHUB_TOKEN, and GitHub does not start workflows from that token's events, so this also runs when the Release
@@ -95,7 +96,9 @@ jobs:
       - name: Check the wheel, sdist and executable are for this version
         run: |
           cd dl
-          ls "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz"             "wikihose-$VERSION-windows-x86_64.exe"             "wikihose-$VERSION-linux-x86_64.tar.gz" "wikihose-$VERSION-linux-arm64.tar.gz"             "wikihose-$VERSION-macos-arm64.tar.gz" "wikihose-$VERSION-macos-x86_64.tar.gz"
+          for f in "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz" "wikihose-$VERSION-windows-x86_64.exe" "wikihose-$VERSION-linux-x86_64.tar.gz" "wikihose-$VERSION-linux-arm64.tar.gz" "wikihose-$VERSION-macos-arm64.tar.gz" "wikihose-$VERSION-macos-x86_64.tar.gz"; do
+            [ -f "$f" ] || { echo "::error::$f is not among the published files"; exit 1; }
+          done
 
   pipx:
     name: pipx install from PyPI (${{ matrix.os }})
