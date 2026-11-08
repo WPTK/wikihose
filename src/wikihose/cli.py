@@ -100,6 +100,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 async def run(args: argparse.Namespace, config: Config, config_path: Path | None) -> int:
     """Build the data source the arguments ask for, then run the app (or the headless summary) on it."""
+    with ExitStack() as resources:  # keeps the demo file's path valid for the whole run, since the demo rewinds
+        return await _run(args, config, config_path, resources)
+
+
+async def _run(args: argparse.Namespace, config: Config, config_path: Path | None, resources: ExitStack) -> int:
     from wikihose.net import Client, RequestBudget
     from wikihose.sources.live import LiveSource
     from wikihose.sources.protocol import DataSource
@@ -109,7 +114,6 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
     clock = SystemClock()
     client: Client | None = None
     source: DataSource
-    resources = ExitStack()  # keeps the demo file's path valid for the whole run, since the demo rewinds
     if args.replay is not None or args.demo:
         try:
             if args.demo:
@@ -117,7 +121,6 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
             else:
                 source = ReplaySource(args.replay, clock, speed=args.speed or 1.0)
         except (RecordingError, OSError) as exc:
-            resources.close()
             print(f"wikihose: {exc}", file=sys.stderr)
             return 1
     else:
@@ -144,6 +147,5 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
         return 0
     finally:
         await source.aclose()
-        resources.close()
         if client is not None:
             await client.aclose()

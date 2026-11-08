@@ -19,7 +19,7 @@ from wikihose.clock import VirtualClock
 from wikihose.headless import run_headless
 from wikihose.sources.recording import demo_recording, read_recording, sample_recording
 from wikihose.sources.replay import ReplaySource
-from wikihose.ui.tabs.live import LiveTab
+from wikihose.ui.tabs.live import FilterLine, LiveTab
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -243,7 +243,7 @@ async def test_the_demo_does_not_offer_or_allow_a_wiki_change(clock: VirtualCloc
         await pilot.press("i")
         await pilot.pause()
         assert type(app.screen).__name__ == "MainScreen"
-        await live_tab(app).run_action("pick('wiki')")
+        await app.query_one(FilterLine).run_action("pick('wiki')")
         await pilot.pause()
         assert type(app.screen).__name__ == "MainScreen"
 
