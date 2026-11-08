@@ -42,6 +42,7 @@ def test_articles_are_kept(enwiki: NamespaceFilter, title: str) -> None:
         "Wikipedia_talk:Foo",
         "User_talk:Example",
         "Main_Page",
+        ":Category:Cats",
     ],
 )
 def test_other_pages_are_dropped(enwiki: NamespaceFilter, title: str) -> None:
@@ -62,6 +63,16 @@ def test_accepts_the_query_part_alone() -> None:
     flt = NamespaceFilter.from_siteinfo(payload)
     assert not flt.is_article("Datei:Foo.jpg")
     assert not flt.is_article("File:Foo.jpg")
+    assert flt.is_article("Foo")
+
+
+def test_accepts_formatversion_2_shapes() -> None:
+    payload = {
+        "namespaces": [{"id": 0, "name": ""}, {"id": 6, "name": "File", "canonical": "File"}],
+        "namespacealiases": [{"id": 6, "alias": "Image"}],
+    }
+    flt = NamespaceFilter.from_siteinfo(payload)
+    assert not flt.is_article("Image:Foo.jpg")
     assert flt.is_article("Foo")
 
 

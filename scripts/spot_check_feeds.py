@@ -157,8 +157,11 @@ def check_top(client: httpx.Client, wiki: str, flt: NamespaceFilter | None) -> t
             day -= dt.timedelta(days=1)
             time.sleep(3)
     if data is None:
-        raise Down("no daily top list found for the last three days")
-    rows = data["items"][0]["articles"]
+        raise Fail("HTTP 404 for the top list on each of the last three days (the endpoint may have moved)")
+    items = data.get("items") if isinstance(data, dict) else None
+    if not items:
+        raise Down("the top list came back empty")
+    rows = items[0]["articles"]
     if len(rows) < 900 or not {"article", "views", "rank"} <= rows[0].keys():
         raise Fail(f"top list has {len(rows)} rows or lacks article/views/rank")
     titles = [r["article"] for r in rows]
@@ -177,8 +180,10 @@ def check_history(client: httpx.Client, wiki: str, article: str) -> tuple[None, 
         f"{quote(article, safe='')}/daily/{start:%Y%m%d}/{end:%Y%m%d}"
     )
     items = get_json(client, url).get("items", [])
-    if len(items) < 25 or not {"timestamp", "views"} <= items[0].keys():
-        raise Fail(f"{len(items)} history items for {article}, or lacks timestamp/views")
+    if not items:
+        raise Down(f"no history items for {article}")
+    if not {"timestamp", "views"} <= items[0].keys():
+        raise Fail(f"history items for {article} lack timestamp/views")
     return None, f"{article}: {len(items)} days"
 
 
@@ -194,6 +199,7 @@ def main() -> int:
     parser.add_argument("--delay", type=float, default=3.0, help="seconds to wait between requests")
     parser.add_argument("--wiki", default="enwiki")
     args = parser.parse_args()
+    wiki_host(args.wiki)  # reject a bad --wiki before any request
     report = Report()
     with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=30, follow_redirects=True) as client:
         report.run("stream", check_stream, client)

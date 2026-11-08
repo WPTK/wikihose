@@ -3,7 +3,8 @@
 The Pageviews top list mixes articles with ``Special:Search``, ``Wikipedia:`` and ``File:`` pages. A colon alone does
 not make a page a non-article (``Ramayana:_Part_1`` is one), so a title is dropped only when the text before its first
 colon is a real namespace name or alias of that wiki, taken from the Action API
-(``meta=siteinfo&siprop=namespaces|namespacealiases|general``). This module is pure: it holds no network code.
+(``meta=siteinfo&siprop=namespaces|namespacealiases|general``, ``formatversion`` 1 or 2). Interwiki prefixes (``wikt:``)
+are not recognised: they do not appear in a wiki's own pageview list. This module is pure: it holds no network code.
 """
 
 from __future__ import annotations
@@ -30,25 +31,27 @@ class NamespaceFilter:
         """Build a filter from a ``format=json`` siteinfo response (the whole body or its ``query`` part)."""
         query = payload.get("query", payload)
         prefixes: set[str] = set()
-        for ns in query.get("namespaces", {}).values():
+        namespaces = query.get("namespaces", {})  # a dict in formatversion 1, a list in 2
+        for ns in namespaces.values() if isinstance(namespaces, Mapping) else namespaces:
             if ns.get("id", 0) == 0:
                 continue
             for key in ("*", "name", "canonical"):
                 if ns.get(key):
                     prefixes.add(_norm(str(ns[key])))
         for alias in query.get("namespacealiases", []):
-            if alias.get("id", 0) != 0 and alias.get("*"):
-                prefixes.add(_norm(str(alias["*"])))
+            name = alias.get("*") or alias.get("alias")
+            if alias.get("id", 0) != 0 and name:
+                prefixes.add(_norm(str(name)))
         main = query.get("general", {}).get("mainpage")
         return cls(frozenset(prefixes), _norm(main) if main else None)
 
     def is_article(self, title: str) -> bool:
         """True for a main-namespace page that is not the wiki's front page."""
-        norm = _norm(title)
+        norm = _norm(title).lstrip(": ")  # a leading colon only forces the namespace reading
         if not norm or norm == self.main_page:
             return False
         head, sep, _ = norm.partition(":")
-        return not (sep and head.strip() in self.prefixes)
+        return not (sep and head in self.prefixes)
 
     def articles(self, titles: list[str]) -> list[str]:
         return [t for t in titles if self.is_article(t)]
