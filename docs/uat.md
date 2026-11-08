@@ -180,7 +180,7 @@ Findings from that run, and where each went:
 | A page with a usual of 0 tops the Reading ranking with a five-digit spike | P3 | #26 |
 | Live log rows are in arrival order, not time order | P3 | #27 |
 | Reading at 240 columns spreads its numbers far from the titles; a blank cell in one sparkline | P3 | #28 |
-| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns, so `] Skip` cannot be seen or clicked | P2 | Fixed for #29: `i` is off in every replay (a recording holds one wiki; `--wiki` picks it); `test_the_footer_fits_80_columns_on_every_tab[replay]` |
+| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns, so `] Skip` cannot be seen or clicked | P2 | Fixed for #29: `i` is off in every replay, which plays in the wiki its recording holds (`--wiki` picks one for a recording of every wiki); `test_the_footer_fits_80_columns_on_every_tab[replay]` |
 
 No orange anywhere in the captures (the one orange-range value is the window-frame dot the SVG export draws). Every
 tab fits 80x24 and 240x60 with nothing cut sideways, and Reading and Convergence show the demo's recorded day.

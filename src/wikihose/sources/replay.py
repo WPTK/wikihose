@@ -37,6 +37,11 @@ class ReplaySource:
         self._closed = False
 
     @property
+    def wiki(self) -> str:
+        """The wiki the recording was filtered to (``enwiki``), or ``all``, from its header."""
+        return self._header.wiki
+
+    @property
     def skipped_lines(self) -> int:
         """Bad lines passed over so far; complete once the replay has finished."""
         return self._events.skipped
