@@ -7,3 +7,4 @@ This file follows [Common Changelog](https://common-changelog.org/).
 ### Added
 
 - Add the project scaffold and `--version` (#6)
+- Add `--selftest`, which checks the install without the network (#7)
