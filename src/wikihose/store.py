@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 SCHEMA_V1 = [
@@ -54,10 +54,14 @@ class Store:
                 for statement in MIGRATIONS[step]:
                     self._db.execute(statement)
                 self._db.execute(f"PRAGMA user_version = {step + 1}")
+                self._db.execute("COMMIT")
             except BaseException:
-                self._db.execute("ROLLBACK")
+                self._rollback()
                 raise
-            self._db.execute("COMMIT")
+
+    def _rollback(self) -> None:
+        with suppress(sqlite3.Error):  # nothing to undo if SQLite already ended the transaction
+            self._db.execute("ROLLBACK")
 
     def schema_version(self) -> int:
         return int(self._db.execute("PRAGMA user_version").fetchone()[0])
@@ -104,10 +108,10 @@ class Store:
         self._db.execute("BEGIN")
         try:
             yield
+            self._db.execute("COMMIT")
         except BaseException:
-            self._db.execute("ROLLBACK")
+            self._rollback()
             raise
-        self._db.execute("COMMIT")
 
     def close(self) -> None:
         self._db.close()

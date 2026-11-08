@@ -99,15 +99,19 @@ class RecordedEvents:
         self._lines = lines
         self._handle = handle
         self.skipped = 0
+        self._closed = False
 
     def __iter__(self) -> Iterator[RecordedEvent]:
         return self
 
     def close(self) -> None:
+        self._closed = True
         self._handle.close()
 
     def __next__(self) -> RecordedEvent:
         while True:
+            if self._closed:
+                raise StopIteration
             try:
                 line = next(self._lines)
             except StopIteration:

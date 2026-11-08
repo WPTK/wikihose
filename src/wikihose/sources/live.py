@@ -8,13 +8,12 @@ the last event ID, so Wikimedia resumes where the stream left off.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from collections.abc import AsyncIterator, Awaitable
 from typing import Any
 
 from wikihose.clock import Clock
 from wikihose.net import Client, FetchError
-from wikihose.sources.events import FeedState, FeedStatus, StreamItem, parse_event
+from wikihose.sources.events import FeedState, FeedStatus, StreamItem, is_canary, parse_event
 from wikihose.sources.recording import Recorder
 from wikihose.sse import OVERSIZE, SseEvent, valid_event_id
 
@@ -56,17 +55,24 @@ class LiveSource:
         stopper = asyncio.ensure_future(self._stop.wait())
         try:
             await asyncio.wait({task, stopper}, return_when=asyncio.FIRST_COMPLETED)
-            if task.done():
-                return task.result()
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-            return _STOPPED
-        except BaseException:
-            task.cancel()
+        except BaseException:  # the caller was cancelled: finish the inner task first, then let the cancel go on
+            await self._cancel(task)
             raise
         finally:
             stopper.cancel()
+        if task.done():
+            return task.result()
+        await self._cancel(task)
+        return _STOPPED
+
+    @staticmethod
+    async def _cancel(task: asyncio.Future[Any]) -> None:
+        """Cancel ``task`` and wait until it has ended. ``asyncio.wait`` never raises the task's own error, and a
+        cancel aimed at the caller during the wait still propagates."""
+        task.cancel()
+        await asyncio.wait({task})
+        if not task.cancelled():
+            task.exception()  # mark it retrieved
 
     async def _next(self, stream: AsyncIterator[SseEvent]) -> Any:
         try:
@@ -95,6 +101,8 @@ class LiveSource:
                             break
                         if valid_event_id(event.id):
                             last_id = event.id
+                        if is_canary(event.data):
+                            continue  # not an edit, and not worth recording
                         if event.event == OVERSIZE:
                             item, well_formed = None, False
                         else:

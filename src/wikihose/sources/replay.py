@@ -69,6 +69,8 @@ class ReplaySource:
     async def items(self) -> AsyncIterator[StreamItem]:
         yield FeedStatus("stream", "ok", at=self.moment())
         for event in self._events:
+            if self._closed:
+                break
             while event.t > self._elapsed and not self._closed:
                 if self.paused:
                     await self._running.wait()

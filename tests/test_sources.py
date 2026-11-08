@@ -6,7 +6,7 @@ import asyncio
 import gzip
 import json
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -841,3 +841,57 @@ def test_read_recording_reports_flipped_bytes_in_the_header(sample_path: Path, t
     damaged.write_bytes(bytes(data))
     with pytest.raises(RecordingError):
         read_recording(damaged)
+
+
+async def test_aclose_between_two_yields_ends_the_replay_cleanly(clock: VirtualClock, tmp_path: Path) -> None:
+    source = ReplaySource(small_recording(tmp_path, [0.0, 0.0, 0.0]), clock)
+    seen = []
+    async for item in source.items():
+        seen.append(item)
+        if isinstance(item, Edit):
+            await source.aclose()  # the next pull must end, not read a closed file
+    assert [type(i).__name__ for i in seen] == ["FeedStatus", "Edit", "FeedStatus"]
+
+
+class _SpyClient:
+    """Wraps a Client and remembers the stream generators it handed out."""
+
+    def __init__(self, inner: Client) -> None:
+        self._inner = inner
+        self.streams: list[AsyncGenerator[SseEvent]] = []
+
+    def stream(self, url: str, last_event_id: str | None = None) -> AsyncGenerator[SseEvent]:
+        generator = self._inner.stream(url, last_event_id)
+        self.streams.append(generator)
+        return generator
+
+
+@respx.mock
+async def test_cancelling_a_consumer_in_a_hung_read_closes_the_stream(client: Client, clock: VirtualClock) -> None:
+    respx.get(RECENTCHANGE_URL).mock(
+        return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, stream=_Hang())
+    )
+    spy = _SpyClient(client)
+    source = LiveSource(spy, clock)  # type: ignore[arg-type]
+    task = asyncio.create_task(take(source, 100))
+    for _ in range(50):
+        await asyncio.sleep(0)
+    assert not task.done() and spy.streams
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert all(generator.ag_frame is None for generator in spy.streams)  # closed, not left running
+
+
+@respx.mock
+async def test_canary_events_are_not_recorded(client: Client, clock: VirtualClock, tmp_path: Path) -> None:
+    canary = json.loads(make_edit())
+    canary["meta"] = {"domain": "canary"}
+    body = sse_body([RecordedEvent(0, "1", json.dumps(canary)), RecordedEvent(0, "2", make_edit())])
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(body)))
+    out = tmp_path / "canary.jsonl.gz"
+    source = LiveSource(client, clock, recorder=Recorder(out, clock, None))
+    await take_until_reconnecting(source)
+    await source.aclose()
+    recorded, _ = read_all(out)
+    assert [e.id for e in recorded] == ["2"]

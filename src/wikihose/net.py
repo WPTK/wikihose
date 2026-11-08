@@ -254,5 +254,7 @@ class Client:
             await response.aclose()
 
     async def aclose(self) -> None:
-        await self._stream_http.aclose()
-        await self._http.aclose()
+        try:
+            await self._stream_http.aclose()
+        finally:
+            await self._http.aclose()
