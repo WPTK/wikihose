@@ -5,7 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from support import EASTERN, ListSource, live_tab, make_app, make_edit, settle, wait_for_stream
+from support import (
+    EASTERN,
+    ListSource,
+    footer_keys,
+    footer_text,
+    live_tab,
+    make_app,
+    make_edit,
+    settle,
+    wait_for_stream,
+)
 from textual.widgets import Button, DataTable, Input, Label, TabbedContent
 
 from wikihose.clock import VirtualClock
@@ -278,7 +288,7 @@ async def test_clicking_help_in_the_footer_opens_help(clock: VirtualClock) -> No
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        key = next(k for k in app.query("FooterKey") if "Help" in str(k.render()))
+        key = next(k for k in await footer_keys(pilot, app, needing="Help") if "Help" in str(k.render()))
         await pilot.click(offset=(key.region.x + 1, key.region.y))
         await pilot.pause()
         assert isinstance(app.screen, HelpScreen)
@@ -288,7 +298,7 @@ async def test_clicking_a_footer_key_runs_its_action(clock: VirtualClock) -> Non
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        key = next(k for k in app.query("FooterKey") if "Bots" in str(k.render()))
+        key = next(k for k in await footer_keys(pilot, app, needing="Bots") if "Bots" in str(k.render()))
         await pilot.click(offset=(key.region.x + 1, key.region.y))
         await pilot.pause()
         assert live_tab(app).hide_bots is False
@@ -340,9 +350,9 @@ async def test_replay_keys_do_nothing_in_a_live_session(clock: VirtualClock, key
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press(key)
         await pilot.pause()
-        footer_text = " ".join(str(k.render()) for k in app.query("FooterKey"))
-        assert "Faster" not in footer_text
-        assert "Skip" not in footer_text
+        shown = footer_text(await footer_keys(pilot, app, needing="Quit"))
+        assert "Faster" not in shown
+        assert "Skip" not in shown
         assert str(app.query_one("#topbar-right").render()) == ""
 
 
@@ -351,13 +361,13 @@ async def test_footer_shows_the_replay_keys_only_in_a_replay(clock: VirtualClock
         replay = make_app(ReplaySource(path, clock), clock)
         async with replay.run_test(size=(140, 30)) as pilot:
             await pilot.pause()
-            text = " ".join(str(k.render()) for k in replay.query("FooterKey"))
+            text = footer_text(await footer_keys(pilot, replay, needing="Skip"))
             for label in ("Play", "Faster", "Slower", "Skip"):
                 assert label in text
     live = app_with(clock)
     async with live.run_test(size=(140, 30)) as pilot:
         await pilot.pause()
-        text = " ".join(str(k.render()) for k in live.query("FooterKey"))
+        text = footer_text(await footer_keys(pilot, live, needing="Quit"))
         for label in ("Bots", "Articles", "Size", "Wiki", "Pause", "Watch", "Help", "Quit"):
             assert label in text
         for label in ("Play", "Faster", "Slower", "Skip"):
