@@ -83,7 +83,7 @@ class MainScreen(Screen[None]):
                 with TabPane(label, id=tab_id):
                     yield StubPane(text)
         yield HealthBar()
-        yield Footer(show_command_palette=False)
+        yield Footer(show_command_palette=False, compact=True)
         yield TooSmall()
 
     def on_mount(self) -> None:
@@ -102,7 +102,9 @@ class MainScreen(Screen[None]):
         cover = self.query_one(TooSmall)
         small = width < FLOOR[0] or height < FLOOR[1]
         if small:
-            cover.update(f"Make the window bigger.\nwikihose needs {FLOOR[0]}x{FLOOR[1]}; this one is {width}x{height}.")
+            cover.update(
+                f"Make the window bigger.\nwikihose needs {FLOOR[0]}x{FLOOR[1]}; this one is {width}x{height}."
+            )
         cover.display = small
 
     def focus_active_pane(self) -> None:
@@ -144,7 +146,7 @@ class WikihoseApp(App[None]):
         Binding("3", "tab('watchlist')", "Watchlist", show=False),
         Binding("4", "tab('diff')", "Diff", show=False),
         Binding("5", "tab('convergence')", "Convergence", show=False),
-        Binding("w", "watch", "Watch", tooltip="Watch the page under the cursor, or type a title or paste a URL"),
+        Binding("w", "watch", "Watch", tooltip="Watch the selected page, or type a title or URL"),
         Binding("question_mark", "help", "Help", key_display="?", tooltip="Show this list of keys"),
         Binding("q", "quit", "Quit", tooltip="Quit wikihose"),
         # Replay keys: only active when the source is a replay (see check_action).
@@ -152,7 +154,11 @@ class WikihoseApp(App[None]):
         Binding("plus", "replay_faster", "Faster", key_display="+", tooltip="Play the replay faster (up to 16x)"),
         Binding("minus", "replay_slower", "Slower", key_display="-", tooltip="Play the replay slower (down to 0.5x)"),
         Binding(
-            "right_square_bracket", "replay_skip", "Skip", key_display="]", tooltip="Skip ahead 60 seconds of the replay"
+            "right_square_bracket",
+            "replay_skip",
+            "Skip",
+            key_display="]",
+            tooltip="Skip ahead 60 seconds of the replay",
         ),
     ]
 
@@ -229,7 +235,7 @@ class WikihoseApp(App[None]):
         if isinstance(focused, PageTable):
             page = focused.page_at_cursor()
             if page is not None:
-                self.watch(*page)
+                self.watch_page(*page)
                 return
         self.push_screen(AddPage(), self._page_typed)
 
@@ -237,9 +243,9 @@ class WikihoseApp(App[None]):
         if not text:
             return
         parsed = title_from_url(text)
-        self.watch(*(parsed or (self.wiki, text)))
+        self.watch_page(*(parsed or (self.wiki, text)))
 
-    def watch(self, wiki: str, title: str) -> None:
+    def watch_page(self, wiki: str, title: str) -> None:
         shown = page_key(wiki, title)[1]
         if self.watchlist.add(wiki, title):
             self.notify(f"Watching {shown}", timeout=3)
@@ -252,7 +258,7 @@ class WikihoseApp(App[None]):
         self.push_screen(HelpScreen(self.help_lines()))
 
     def help_lines(self) -> list[tuple[str, str]]:
-        """One line per active key we declare (from the bindings, so it can only list real keys), then the fixed lines."""
+        """One line per active key we declare (read from the bindings), then the fixed lines."""
         nodes: dict[int, DOMNode] = {}
         for active in self.screen.active_bindings.values():
             nodes[id(active.node)] = active.node
@@ -267,7 +273,7 @@ class WikihoseApp(App[None]):
 
     # --- replay keys -------------------------------------------------------------------------------------------------
 
-    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+    def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
         if action.startswith("replay_"):
             return isinstance(self.source, ReplaySource)
         return True

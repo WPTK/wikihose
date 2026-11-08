@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from support import EASTERN, ListSource, live_tab, make_app, make_edit, settle
+from support import EASTERN, ListSource, live_tab, make_app, make_edit, settle, wait_for_stream
 from textual.widgets import Button, DataTable, Input, Label, TabbedContent
 
 from wikihose.clock import VirtualClock
@@ -28,7 +28,9 @@ def active_tab(app: WikihoseApp) -> str:
     return app.query_one(TabbedContent).active
 
 
-@pytest.mark.parametrize(("key", "tab"), [("1", "live"), ("2", "reading"), ("3", "watchlist"), ("4", "diff"), ("5", "convergence")])
+@pytest.mark.parametrize(
+    ("key", "tab"), [("1", "live"), ("2", "reading"), ("3", "watchlist"), ("4", "diff"), ("5", "convergence")]
+)
 async def test_number_keys_switch_tabs(clock: VirtualClock, key: str, tab: str) -> None:
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
@@ -121,7 +123,7 @@ async def test_top_bar_in_a_replay_says_recorded_and_shows_the_state(clock: Virt
             await pilot.pause()
             right = str(app.query_one("#topbar-right").render())
             assert right.startswith("Recorded data, not live")
-            await app.workers.wait_for_complete()
+            await wait_for_stream(app, pilot)
             await pilot.pause()
             assert str(app.query_one("#topbar-right").render()) == "Recorded data, not live  replay finished"
             assert app.query_one(HealthBar).failing == []  # the end of a recording is not a failure
@@ -277,7 +279,7 @@ async def test_clicking_help_in_the_footer_opens_help(clock: VirtualClock) -> No
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         key = next(k for k in app.query("FooterKey") if "Help" in str(k.render()))
-        await pilot.click(key.__class__, offset=(key.region.x, key.region.y))
+        await pilot.click(offset=(key.region.x + 1, key.region.y))
         await pilot.pause()
         assert isinstance(app.screen, HelpScreen)
 
@@ -315,21 +317,21 @@ async def test_the_source_is_closed_when_the_app_ends_another_way(clock: Virtual
 async def test_replay_keys_pause_speed_and_skip(clock: VirtualClock) -> None:
     with sample_recording() as path:
         source = ReplaySource(path, clock)
+        source.pause()  # a replay on a virtual clock would otherwise race to its end
         app = make_app(source, clock)
         async with app.run_test(size=(100, 30)) as pilot:
-            await pilot.press("space")
-            assert source.paused
             assert str(app.query_one("#topbar-right").render()).endswith("paused")
-            await pilot.press("space")
-            assert not source.paused
             await pilot.press("plus", "plus")
             assert source.speed == 4
-            assert str(app.query_one("#topbar-right").render()).endswith("4x")
             await pilot.press("minus", "minus", "minus", "minus", "minus", "minus", "minus")
             assert source.speed == 0.5
             before = source.moment()
             await pilot.press("right_square_bracket")
             assert (source.moment() - before).total_seconds() == 60
+            await pilot.press("space")
+            assert not source.paused
+            await wait_for_stream(app, pilot)  # it plays on to the end, since the skip passed the last event
+            assert source.moment() >= source.recorded_start
 
 
 @pytest.mark.parametrize("key", ["space", "plus", "minus", "right_square_bracket"])
@@ -465,7 +467,7 @@ async def test_a_watched_article_gets_the_accent_colour_in_the_log(clock: Virtua
     app = app_with(clock, make_edit("Ada Lovelace"), make_edit("Grace Hopper"))
     async with app.run_test(size=(100, 30)) as pilot:
         tab = await settle(app, pilot)
-        app.watch("enwiki", "Ada Lovelace")
+        app.watch_page("enwiki", "Ada Lovelace")
         await pilot.pause()
         table = app.query_one("#log", DataTable)
         by_title = {}

@@ -29,8 +29,10 @@ class HelpScreen(ModalScreen[None]):
     BINDINGS = [Binding("escape,question_mark", "dismiss", "Close", show=False)]
     DEFAULT_CSS = """
     HelpScreen { align: center middle; }
-    HelpScreen > Vertical { width: 60; height: auto; max-height: 100%; border: round $primary; background: $surface; padding: 0 1; }
+    HelpScreen > Vertical { width: 72; height: auto; max-height: 100%; border: round $primary; background: $surface;
+        padding: 0 1; }
     HelpScreen VerticalScroll { height: auto; }
+    HelpScreen .help-line { width: 100%; }
     HelpScreen Button { margin-top: 1; }
     """
 
@@ -54,7 +56,8 @@ class AddPage(ModalScreen[str | None]):
     BINDINGS = [Binding("escape", "dismiss(None)", "Cancel", show=False)]
     DEFAULT_CSS = """
     AddPage { align: center middle; }
-    AddPage > Vertical { width: 64; height: auto; border: round $primary; background: $surface; padding: 0 1; }
+    AddPage > Vertical { width: 64; height: auto; border: round $primary; background: $surface;
+        padding: 0 1; }
     AddPage Horizontal { height: auto; }
     """
 
@@ -78,7 +81,8 @@ class WikiPrompt(ModalScreen[str | None]):
     BINDINGS = [Binding("escape", "dismiss(None)", "Cancel", show=False)]
     DEFAULT_CSS = """
     WikiPrompt { align: center middle; }
-    WikiPrompt > Vertical { width: 64; height: auto; border: round $primary; background: $surface; padding: 0 1; }
+    WikiPrompt > Vertical { width: 64; height: auto; border: round $primary; background: $surface;
+        padding: 0 1; }
     WikiPrompt #wiki-error { color: $error; height: auto; }
     """
 
@@ -100,7 +104,8 @@ class EditDetail(ModalScreen[None]):
     BINDINGS = [Binding("escape", "dismiss", "Close", show=False)]
     DEFAULT_CSS = """
     EditDetail { align: center middle; }
-    EditDetail > Vertical { width: 72; height: auto; max-height: 100%; border: round $primary; background: $surface; padding: 0 1; }
+    EditDetail > Vertical { width: 72; height: auto; max-height: 100%; border: round $primary; background: $surface;
+        padding: 0 1; }
     EditDetail Label { width: 100%; }
     EditDetail Button { margin-top: 1; }
     """

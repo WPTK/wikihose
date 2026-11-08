@@ -46,3 +46,4 @@ jobs:
       - run: python -m pytest -n auto
       - run: python -m wikihose --version
       - run: python -m wikihose --selftest
+      - run: python -m wikihose --replay src/wikihose/data/sample.jsonl.gz --headless-seconds 5

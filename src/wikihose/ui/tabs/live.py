@@ -172,8 +172,8 @@ class LiveTab(Vertical):
         self._subscribe(self.accept)
         self._watchlist.subscribe(self._watchlist_changed)
         top = self.query_one("#top", PageTable)
-        top.add_column("Edits", width=TOP_EDITS_WIDTH)
-        top.add_column("Article", width=TOP_TITLE_WIDTH)
+        top.add_column("Edits", width=TOP_EDITS_WIDTH, key="Edits")
+        top.add_column("Article", width=TOP_TITLE_WIDTH, key="Article")
         self._draw_filters()
         self.refresh_side()
         self.set_interval(FLUSH_SECONDS, self.flush_log)
@@ -214,7 +214,7 @@ class LiveTab(Vertical):
         return abs(edit.delta) >= self.min_bytes
 
     def flush_log(self) -> None:
-        """Move queued edits into the log. Runs every quarter second, so a burst makes one redraw. Does nothing paused."""
+        """Move queued edits into the log. Runs every quarter second, so a burst is one redraw. No-op when paused."""
         if self.paused or not self._pending:
             return
         while self._pending:
@@ -342,7 +342,9 @@ class LiveTab(Vertical):
         table.clear()
         self._top_keys = []
         for title, count in self._stats.top(TOP_COUNT):
-            shown = Text(title, no_wrap=True, style=theme.accent if (self.wiki, title) in self._watchlist else "")
+            shown = Text(
+                title, no_wrap=True, style=(theme.accent or "") if (self.wiki, title) in self._watchlist else ""
+            )
             shown.truncate(TOP_TITLE_WIDTH, overflow="ellipsis")
             table.add_row(Text(f"{count}", justify="right"), shown, key=title)
             self._top_keys.append(title)

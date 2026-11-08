@@ -58,10 +58,12 @@ class ListSource:
         self.clock = clock
         self.items_to_play = items or []
         self.closed = False
+        self.ended = False
 
     async def items(self) -> AsyncIterator[StreamItem]:
         for item in self.items_to_play:
             yield item
+        self.ended = True
 
     async def aclose(self) -> None:
         self.closed = True
@@ -78,9 +80,18 @@ def live_tab(app: WikihoseApp) -> LiveTab:
 
 async def settle(app: WikihoseApp, pilot: Any) -> LiveTab:
     """Let the stream worker finish, draw the log and the side column, and return the Live tab."""
-    await app.workers.wait_for_complete()
+    await wait_for_stream(app, pilot)
     tab = live_tab(app)
     tab.flush_log()
     tab.refresh_side()
     await pilot.pause()
     return tab
+
+
+async def wait_for_stream(app: WikihoseApp, pilot: Any) -> None:
+    """Yield to the event loop until the source has played everything it had (the worker starts after the first draw)."""
+    for _ in range(1000):
+        if getattr(app.source, "ended", False) or app.replay_finished:
+            return
+        await pilot.pause()
+    raise AssertionError("the source never finished")
