@@ -1,7 +1,8 @@
 """The Watchlist tab: the pages you track, how many edits you have not looked at, and keys to open, mark or remove one.
 
-Enter opens the Diff tab from the revision last seen to the newest known. ``m`` marks the page seen without opening it
-and ``d`` (or Delete) stops watching it after a question. Adding a page is the shell's ``w`` and ``W``.
+Enter (or a double click) opens the page on Wikipedia, like every tab with rows. ``d`` opens the Diff tab from the
+revision last seen to the newest known. ``m`` marks the page seen without opening it and ``x`` (or Delete) stops
+watching it after a question. Adding a page is the shell's ``w`` and ``W``.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.timer import Timer
-from textual.widgets import DataTable, Static
+from textual.widgets import Static
 
 from wikihose.diff import DiffHeader
 from wikihose.net import FetchError
@@ -26,7 +27,7 @@ from wikihose.titles import article_url, host_for_wiki
 from wikihose.trend import Trends
 from wikihose.ui.dialogs import ConfirmRemove
 from wikihose.ui.tabs.diff import DiffRequest, OpenDiff
-from wikihose.ui.widgets import spark
+from wikihose.ui.widgets import PageTable, spark
 from wikihose.watchlist import Watchlist
 
 EDITOR_FROM = 100  # columns of window width
@@ -62,8 +63,9 @@ def describe_trend(error: FetchError, title: str) -> str:
 
 class WatchlistTab(Vertical):
     BINDINGS = [
+        Binding("d", "show_diff", "Diff", tooltip="Show what changed on the selected page since you last looked"),
         Binding("m", "mark_seen", "Seen", tooltip="Mark the selected page as seen"),
-        Binding("d", "remove", "Remove", tooltip="Stop watching the selected page (asks first)"),
+        Binding("x", "remove", "Remove", tooltip="Stop watching the selected page (asks first)"),
         Binding("delete", "remove", "Remove", show=False, tooltip="Stop watching the selected page (asks first)"),
     ]
 
@@ -95,7 +97,7 @@ class WatchlistTab(Vertical):
     def compose(self) -> ComposeResult:
         yield Static(id="watch-status")
         yield Static(EMPTY, id="watch-empty")
-        yield DataTable(id="watch-table", cursor_type="row", zebra_stripes=False)
+        yield PageTable(self._page_of_row, watchable=False, id="watch-table", cursor_type="row", zebra_stripes=False)
 
     def on_mount(self) -> None:
         self._watchlist.subscribe(self._schedule_refresh)
@@ -197,7 +199,7 @@ class WatchlistTab(Vertical):
         if not self.is_mounted:
             return
         try:
-            table = self.query_one("#watch-table", DataTable)
+            table = self.query_one("#watch-table", PageTable)
         except NoMatches:  # the app is quitting
             return
         pages = self._watchlist.pages()
@@ -248,7 +250,7 @@ class WatchlistTab(Vertical):
                 self.call_after_refresh(table.scroll_to, y=scroll, animate=False, immediate=True)
 
     def page_under_cursor(self) -> WatchedPage | None:
-        table = self.query_one("#watch-table", DataTable)
+        table = self.query_one("#watch-table", PageTable)
         if not table.row_count:
             return None
         key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value
@@ -256,9 +258,13 @@ class WatchlistTab(Vertical):
 
     # --- keys --------------------------------------------------------------------------------------------------------
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        event.stop()
-        page = self._rows.get(event.row_key.value or "")
+    def _page_of_row(self, key: str) -> tuple[str, str] | None:
+        page = self._rows.get(key)
+        return None if page is None else (page.wiki, page.title)
+
+    def action_show_diff(self) -> None:
+        """Open the Diff tab on what changed since the reader last looked at the selected page."""
+        page = self.page_under_cursor()
         if page is None:
             return
         if page.seen_rev_id <= 0 or page.last_rev_id <= page.seen_rev_id:

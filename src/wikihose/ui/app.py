@@ -32,10 +32,11 @@ from wikihose.sources.events import Edit, FeedStatus, PageMove, StreamItem
 from wikihose.sources.protocol import DataSource
 from wikihose.sources.replay import ReplaySource
 from wikihose.store import Store, WatchedPage
-from wikihose.titles import page_key
+from wikihose.titles import page_key, page_url
 from wikihose.trend import Trends
 from wikihose.ui.bars import HealthBar, TopBar
 from wikihose.ui.bindings import declared_bindings, help_text, key_label
+from wikihose.ui.browser import open_in_browser
 from wikihose.ui.dialogs import FIXED_HELP, AddPage, HelpScreen
 from wikihose.ui.tabs.convergence import ConvergenceTab
 from wikihose.ui.tabs.diff import DiffTab, OpenDiff
@@ -345,6 +346,14 @@ class WikihoseApp(App[None]):
         self.action_tab("diff")
         self.query_one(DiffTab).show(message.request)
 
+    def on_page_table_open(self, message: PageTable.Open) -> None:
+        """Enter or a double click on a row of any tab: open that page on its wiki in the web browser."""
+        message.stop()
+        page = message.table.page_at_cursor()
+        if page is not None:
+            wiki, title = page
+            open_in_browser(self, page_url(wiki, title), title)
+
     def _watchlist_changed(self) -> None:
         self.show_unseen()
 
@@ -428,7 +437,7 @@ class WikihoseApp(App[None]):
 
     def action_watch(self) -> None:
         focused = self.focused
-        if isinstance(focused, PageTable):
+        if isinstance(focused, PageTable) and focused.watchable:
             page = focused.page_at_cursor()
             if page is not None:
                 self.watch_page(*page)

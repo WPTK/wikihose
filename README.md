@@ -17,13 +17,13 @@ where the two overlap, and edits to the pages you choose to track.
   sparkline and the article summary.
 - **Watchlist:** pages you track. Press `w` on any article row, or `W` to type a title or paste a link. Edits to them
   are marked in the Live log and counted on the tab, including edits made while wikihose was closed.
-- **Diff:** Enter on a watched page shows what changed since you last looked, removed text in red and added text in
-  green.
+- **Diff:** `d` on a Live edit or a watched page shows what changed, removed text in red and added text in green.
 - **Convergence:** articles hot in both: edited by people in the last 15 minutes and read at least twice their usual.
   An article that suddenly gets 10 edits has its own reading history fetched.
 
-`?` lists every key. Every key in the footer is also a button, and rows and tabs take clicks. It fits an 80x24
-terminal.
+`?` lists every key. Every key in the footer is also a button, and rows and tabs take clicks. On any row that names
+a page, Enter (or a double click) opens that page on Wikipedia in your browser, and on the Diff tab it opens the change.
+Where no browser can be opened (over SSH, say), the address is shown instead. It fits an 80x24 terminal.
 
 ## Install
 

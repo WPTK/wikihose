@@ -27,6 +27,7 @@ from wikihose.ui.tabs.diff import DiffTab
 from wikihose.ui.tabs.live import LiveTab
 from wikihose.ui.tabs.reading import ReadingTab
 from wikihose.ui.tabs.watchlist import WatchlistTab
+from wikihose.ui.widgets import PageTable
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -48,15 +49,19 @@ INVENTORY: dict[str, str] = {
     "binding:WikihoseApp:right_square_bracket:replay_skip": "test_replay_keys_pause_speed_and_skip",
     "binding:LiveTab:b:toggle_bots": "test_b_hides_and_shows_bot_edits",
     "binding:LiveTab:a:toggle_articles": "test_a_toggle_refills_the_log_from_the_last_edits",
-    "binding:LiveTab:m:cycle_size": "test_size_key_cycles_through_the_steps",
+    "binding:LiveTab:s:cycle_size": "test_size_key_cycles_through_the_steps",
     "binding:LiveTab:i:change_wiki": "test_i_switches_wiki_and_starts_the_numbers_over",
     "binding:LiveTab:p:toggle_pause": "test_pause_holds_the_log_while_the_numbers_keep_counting",
-    "binding:LiveTab:d:show_diff": "test_d_on_a_live_edit_shows_its_diff_and_b_goes_back",
+    "binding:LiveTab:d:show_diff": "test_d_on_a_live_edit_shows_its_diff_and_escape_goes_back",
+    "binding:LiveTab:e:edit_details": "test_e_on_a_log_row_opens_the_detail_with_the_article_link",
+    "binding:WatchlistTab:d:show_diff": "test_d_opens_the_diff_from_the_revision_last_seen_and_marks_the_page_seen",
     "binding:WatchlistTab:m:mark_seen": "test_m_marks_the_selected_page_seen",
-    "binding:WatchlistTab:d:remove": "test_d_and_delete_remove_a_page_after_a_question",
-    "binding:WatchlistTab:delete:remove": "test_d_and_delete_remove_a_page_after_a_question",
+    "binding:WatchlistTab:x:remove": "test_x_and_delete_remove_a_page_after_a_question",
+    "binding:WatchlistTab:delete:remove": "test_x_and_delete_remove_a_page_after_a_question",
+    "binding:PageTable:enter:open_page": "test_enter_on_a_log_row_opens_that_page_in_the_browser",
+    "binding:PageTable:enter:open_page_quiet": "test_in_a_replay_the_live_footer_leaves_out_enter_open_but_enter_still_opens",
     "binding:DiffTab:escape:back": "test_escape_leaves_the_diff_for_the_tab_it_came_from",
-    "binding:DiffTab:b:back": "test_d_on_a_live_edit_shows_its_diff_and_b_goes_back",
+    "binding:DiffTab:enter:open_on_wiki": "test_enter_and_double_click_on_the_diff_open_the_change_on_wikipedia",
     "binding:ConfirmRemove:escape:dismiss(False)": "test_the_remove_question_can_be_cancelled",
     "binding:ReadingTab:r:refresh": "test_r_fetches_again",
     "binding:ReadingTab:n:more_rows": "test_n_cycles_through_25_50_and_100_rows",
@@ -71,6 +76,12 @@ INVENTORY: dict[str, str] = {
     "footer:live:Size": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Wiki": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Diff": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
+    "footer:live:Open": "test_clicking_enter_open_in_the_live_footer_opens_the_selected_page",
+    "footer:reading:Open": "test_enter_and_double_click_on_a_reading_row_open_that_page_in_the_browser",
+    "footer:watchlist:Open": "test_enter_and_double_click_on_a_watched_page_open_it_in_the_browser",
+    "footer:convergence:Open": "test_enter_and_double_click_on_a_convergence_row_open_that_page_in_the_browser",
+    "footer:diff:Open": "test_the_diff_tab_footer_names_enter_only_once_a_change_is_open",
+    "footer:watchlist:Diff": "test_the_watchlist_diff_footer_key_opens_what_changed_since_you_last_looked",
     "footer:watchlist:Seen": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
     "footer:watchlist:Remove": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
     "footer:diff:Back": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
@@ -86,7 +97,11 @@ INVENTORY: dict[str, str] = {
     # Help lines
     "help:b": "test_help_lists_the_active_keys_in_live_mode",
     "help:a": "test_help_lists_the_active_keys_in_live_mode",
-    "help:m": "test_help_lists_the_active_keys_in_live_mode",
+    "help:s": "test_help_lists_the_active_keys_in_live_mode",
+    "help:m": "test_help_on_the_watchlist_and_diff_tabs_lists_their_keys",
+    "help:e": "test_help_lists_the_active_keys_in_live_mode",
+    "help:x": "test_help_on_the_watchlist_and_diff_tabs_lists_their_keys",
+    "help:enter": "test_help_says_what_enter_and_double_click_do",
     "help:i": "test_help_lists_the_active_keys_in_live_mode",
     "help:p": "test_help_lists_the_active_keys_in_live_mode",
     "help:d": "test_help_lists_the_active_keys_in_live_mode",
@@ -103,9 +118,9 @@ INVENTORY: dict[str, str] = {
     "help:-": "test_help_lists_the_replay_keys_only_in_a_replay",
     "help:]": "test_help_lists_the_replay_keys_only_in_a_replay",
     "help:1-5": "test_help_lists_the_active_keys_in_live_mode",
-    "help:Enter": "test_enter_on_a_log_row_opens_the_detail_with_the_article_link",
+    "help:Double click": "test_help_says_what_enter_and_double_click_do",
     "help:Tab": "test_tab_moves_the_focus_between_the_log_and_the_top_table",
-    "help:Mouse": "test_clicking_a_log_row_opens_its_detail",
+    "help:Mouse": "test_clicking_a_log_row_only_moves_the_cursor",
     # Mouse actions
     "click:pick": "test_clicking_the_filter_words_does_what_the_keys_do",
 }
@@ -154,6 +169,13 @@ def collected() -> dict[str, list[str]]:
             if not binding.action.startswith("tab("):
                 text = re.escape(binding.tooltip or binding.description)
                 found.setdefault(f"help:{key_label(binding)}", []).extend([*_key_words(binding), text])
+    for tab in ("live", "reading", "watchlist", "convergence"):  # the tabs whose rows are pages (PageTable)
+        for binding in declared_bindings(PageTable):
+            if binding.show:
+                found[f"footer:{tab}:{binding.description}"] = [_quoted(binding.description)]
+    for binding in declared_bindings(PageTable):
+        text = re.escape(binding.tooltip or binding.description)
+        found.setdefault(f"help:{key_label(binding)}", []).extend([*_key_words(binding), text])
     for key, text in FIXED_HELP:
         found[f"help:{key}"] = [CLICKS] if key == "Mouse" else [_quoted(key), _quoted(key.lower()), re.escape(text)]
     for path in (ROOT / "src" / "wikihose").rglob("*.py"):

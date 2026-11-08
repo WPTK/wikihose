@@ -29,10 +29,10 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                 item.add_marker(pytest.mark.skip(reason=f"real-terminal layer unavailable: {REASON}"))
 
 
-def launch(cols: int, rows: int) -> Terminal:
+def launch(cols: int, rows: int, extra_env: dict[str, str] | None = None) -> Terminal:
     exe = os.environ.get(EXE_ENV)
     argv = [exe, "--demo"] if exe else [sys.executable, "-m", "wikihose", "--demo"]
-    env = {"WIKIHOSE_CONFIG_DIR": "{dir}/config", "WIKIHOSE_DATA_DIR": "{dir}/data"}
+    env = {"WIKIHOSE_CONFIG_DIR": "{dir}/config", "WIKIHOSE_DATA_DIR": "{dir}/data", **(extra_env or {})}
     return Terminal(argv, cols, rows, env=env)
 
 
@@ -42,12 +42,15 @@ def size(request: pytest.FixtureRequest) -> tuple[int, int]:
 
 
 @pytest.fixture
-def start(size: tuple[int, int]) -> Iterator[Callable[[], Terminal]]:
-    """``start()`` runs the program at the parametrized size and waits until the Live tab is drawn."""
+def start(size: tuple[int, int]) -> Iterator[Callable[..., Terminal]]:
+    """``start()`` runs the program at the parametrized size and waits until the Live tab is drawn.
+
+    ``start(env={...})`` adds variables to the child's environment.
+    """
     made: list[Terminal] = []
 
-    def factory() -> Terminal:
-        term = launch(*size)
+    def factory(env: dict[str, str] | None = None) -> Terminal:
+        term = launch(*size, extra_env=env)
         made.append(term)
         term.wait_for(lambda s: "wikihose" in s and "bots" in s, 45, "the Live tab")
         term.settle()

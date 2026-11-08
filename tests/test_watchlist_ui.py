@@ -14,7 +14,7 @@ import pytest
 import respx
 from payloads import ADA_ID, ADA_LATEST, ADA_PREVIOUS, TURING_ID, TURING_LATEST, action_page, fixture
 from payloads import make_edit as ada_edit
-from support import ListSource, action_api, finish_work, make_app, make_edit, settle, wait_for_stream
+from support import FakeBrowser, ListSource, action_api, finish_work, make_app, make_edit, settle, wait_for_stream
 from textual.widgets import DataTable, Static, TabbedContent
 
 from wikihose.clock import VirtualClock
@@ -127,7 +127,7 @@ async def test_a_deleted_page_says_so_in_words(clock: VirtualClock, store: Store
 
 
 @respx.mock
-async def test_enter_opens_the_diff_from_the_revision_last_seen_and_marks_the_page_seen(
+async def test_d_opens_the_diff_from_the_revision_last_seen_and_marks_the_page_seen(
     clock: VirtualClock, store: Store, client: Client
 ) -> None:
     watch_ada(store, clock, unseen=1)
@@ -137,7 +137,7 @@ async def test_enter_opens_the_diff_from_the_revision_last_seen_and_marks_the_pa
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await finish_work(app, pilot)
         assert app.query_one(TabbedContent).active == "diff"
         assert route.call_count == 1
@@ -148,14 +148,14 @@ async def test_enter_opens_the_diff_from_the_revision_last_seen_and_marks_the_pa
         assert (page.unseen, page.seen_rev_id) == (0, ADA_LATEST)
 
 
-async def test_enter_on_a_page_with_nothing_new_says_so(clock: VirtualClock, store: Store) -> None:
+async def test_d_on_a_page_with_nothing_new_says_so(clock: VirtualClock, store: Store) -> None:
     watch_ada(store, clock)
     app = app_for(clock, store, None)
     async with app.run_test(size=SIZE) as pilot:
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await pilot.pause()
         assert app.query_one(TabbedContent).active == "watchlist"
         assert notes(app) == ["Nothing new on Ada Lovelace since you last looked."]
@@ -175,8 +175,8 @@ async def test_m_marks_the_selected_page_seen(clock: VirtualClock, store: Store)
         assert notes(app) == ["Marked Ada Lovelace as seen."]
 
 
-@pytest.mark.parametrize("key", ["d", "delete"])
-async def test_d_and_delete_remove_a_page_after_a_question(clock: VirtualClock, store: Store, key: str) -> None:
+@pytest.mark.parametrize("key", ["x", "delete"])
+async def test_x_and_delete_remove_a_page_after_a_question(clock: VirtualClock, store: Store, key: str) -> None:
     watch_ada(store, clock, unseen=1)
     app = app_for(clock, store, None)
     async with app.run_test(size=SIZE) as pilot:
@@ -203,7 +203,7 @@ async def test_the_remove_question_can_be_cancelled(clock: VirtualClock, store: 
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("d")
+        await pilot.press("x")
         await pilot.pause()
         if answer == "keep":
             await pilot.click("#keep")
@@ -258,7 +258,7 @@ async def test_the_diff_tab_with_nothing_open_says_how_to_open_one(clock: Virtua
 
 
 @respx.mock
-async def test_d_on_a_live_edit_shows_its_diff_and_b_goes_back(
+async def test_d_on_a_live_edit_shows_its_diff_and_escape_goes_back(
     clock: VirtualClock, store: Store, client: Client
 ) -> None:
     route = serve_compare()
@@ -270,7 +270,10 @@ async def test_d_on_a_live_edit_shows_its_diff_and_b_goes_back(
         assert app.query_one(TabbedContent).active == "diff"
         assert route.call_count == 1
         assert "Revisions" in app.query_one(DiffTab).text
-        await pilot.press("b")
+        await pilot.press("b")  # b is Bots on the Live tab; on the Diff tab it does nothing
+        await pilot.pause()
+        assert app.query_one(TabbedContent).active == "diff"
+        await pilot.press("escape")
         await pilot.pause()
         assert app.query_one(TabbedContent).active == "live"
 
@@ -305,7 +308,7 @@ async def test_escape_leaves_the_diff_for_the_tab_it_came_from(
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await finish_work(app, pilot)
         await pilot.press("escape")
         await pilot.pause()
@@ -323,11 +326,11 @@ async def test_a_diff_that_cannot_be_loaded_says_why_in_plain_words_and_leaves_t
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await finish_work(app, pilot)
         tab = app.query_one(DiffTab)
         assert tab.state == "error"
-        assert "That change could not be found." in tab.text and "Press b to go back." in tab.text
+        assert "That change could not be found." in tab.text and "Press Escape to go back." in tab.text
         assert badge(app) == "Watchlist 1"
 
 
@@ -346,7 +349,7 @@ async def test_a_diff_that_is_loading_says_so(clock: VirtualClock, store: Store,
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await pilot.pause()
         assert app.query_one(DiffTab).state == "loading"
         assert "Loading the change" in app.query_one(DiffTab).text
@@ -614,14 +617,14 @@ async def test_help_on_the_watchlist_and_diff_tabs_lists_their_keys(clock: Virtu
         await pilot.press("question_mark")
         await pilot.pause()
         keys = [str(line.render()).split()[0] for line in app.screen.query(".help-line")]
-        assert keys == ["m", "d", "delete", "w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert keys == ["enter", "d", "m", "x", "delete", "w", "W", "?", "q", "1-5", "Double", "Tab", "Mouse"]
         await pilot.press("escape", "4")
         await pilot.pause()
         app.query_one("#diff-scroll").focus()
         await pilot.press("question_mark")
         await pilot.pause()
         keys = [str(line.render()).split()[0] for line in app.screen.query(".help-line")]
-        assert keys[:3] == ["escape", "b", "w"]
+        assert keys[:3] == ["escape", "w", "W"]  # nothing is open, so Enter has nothing to open
 
 
 # --- review fixes: redraws, what counts as seen, the link, odd answers, shutdown --------------------------------------
@@ -740,7 +743,7 @@ async def test_the_diff_always_shows_the_address_of_the_article(
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await finish_work(app, pilot)
         assert "https://en.wikipedia.org/wiki/Ada_Lovelace" in app.query_one(DiffTab).text
         text = app.query_one("#diff-body", Static).render()
@@ -772,7 +775,7 @@ async def test_a_diff_of_several_edits_does_not_name_the_last_editor_as_the_auth
         await pilot.press("3")
         await pilot.pause()
         table(app).focus()
-        await pilot.press("enter")
+        await pilot.press("d")
         await finish_work(app, pilot)
         assert "by Zed" not in app.query_one(DiffTab).text
 
@@ -846,3 +849,149 @@ async def test_updates_to_a_closed_app_are_dropped_quietly(clock: VirtualClock, 
         await pilot.pause()
     app.show_unseen()
     app._on_main(app._main.set_note, "late")
+
+
+# --- opening a page or a change on Wikipedia ---------------------------------------------------------------------------
+
+
+async def test_enter_and_double_click_on_a_watched_page_open_it_in_the_browser(
+    clock: VirtualClock, store: Store, browser: FakeBrowser
+) -> None:
+    from test_app_shell import click_footer
+
+    watch_ada(store, clock, unseen=2)
+    clock.advance(1)
+    store.add_watch("dewiki", 5, "Zürich", clock.now(), 10)
+    app = app_for(clock, store, None)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("3")
+        await pilot.pause()
+        table(app).focus()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == ["https://en.wikipedia.org/wiki/Ada_Lovelace"]
+        await pilot.double_click("#watch-table", offset=(10, 2))  # the header is row 0
+        await pilot.pause()
+        assert browser.opened[1:] == ["https://de.wikipedia.org/wiki/Z%C3%BCrich"]
+        await click_footer(pilot, app, "Open")  # the footer's enter Open does what the key does
+        assert browser.opened[2:] == ["https://de.wikipedia.org/wiki/Z%C3%BCrich"]
+        # Opening a page is not looking at what changed: the page stays unseen and the tab stays the Watchlist.
+        assert app.query_one(TabbedContent).active == "watchlist"
+        assert badge(app) == "Watchlist 2"
+
+
+async def test_a_single_click_on_a_watched_page_only_moves_the_cursor(
+    clock: VirtualClock, store: Store, browser: FakeBrowser
+) -> None:
+    watch_ada(store, clock, unseen=1)
+    app = app_for(clock, store, None)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("3")
+        await pilot.pause()
+        await pilot.click("#watch-table", offset=(10, 1))
+        await pilot.click("#watch-table", offset=(10, 1))
+        await pilot.pause()
+        assert browser.opened == []
+        assert app.query_one(TabbedContent).active == "watchlist"
+        assert notes(app) == []
+
+
+async def test_enter_and_double_click_on_the_diff_open_the_change_on_wikipedia(
+    clock: VirtualClock, store: Store, client: Client, browser: FakeBrowser
+) -> None:
+    serve_compare()
+    app = app_for(clock, store, client, _with_revisions(ada_edit("Ada Lovelace")))
+    async with app.run_test(size=SIZE) as pilot:
+        await settle(app, pilot)
+        await pilot.press("d")
+        await finish_work(app, pilot)
+        change = f"https://en.wikipedia.org/w/index.php?diff={ADA_LATEST}&oldid={ADA_PREVIOUS}"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == [change]
+        await pilot.double_click("#diff-body")
+        await pilot.pause()
+        assert browser.opened == [change, change]
+        await pilot.click("#diff-body")  # a single click does nothing
+        await pilot.pause()
+        assert len(browser.opened) == 2
+        assert any("Opening the change to Ada Lovelace in your browser." in m for m in notes(app))
+
+
+async def test_enter_on_the_empty_diff_tab_does_nothing(
+    clock: VirtualClock, store: Store, browser: FakeBrowser
+) -> None:
+    app = app_for(clock, store, None)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("4")
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.double_click("#diff-body")
+        await pilot.pause()
+        assert browser.opened == []
+        assert notes(app) == []
+
+
+@respx.mock
+async def test_the_diff_tab_footer_names_enter_only_once_a_change_is_open(
+    clock: VirtualClock, store: Store, client: Client
+) -> None:
+    from support import footer_keys, footer_text
+
+    watch_ada(store, clock, unseen=1)
+    serve_compare()
+    app = app_for(clock, store, client)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("4")
+        assert "Open" not in footer_text(await footer_keys(pilot, app, needing="Back"))
+        await pilot.press("3")
+        await pilot.pause()
+        table(app).focus()
+        await pilot.press("d")
+        await finish_work(app, pilot)
+        assert "enter Open" in footer_text(await footer_keys(pilot, app, needing="Open"))
+        await pilot.press("question_mark")
+        await pilot.pause()
+        keys = [str(line.render()).split()[0] for line in app.screen.query(".help-line")]
+        assert keys[:3] == ["escape", "enter", "w"]
+
+
+@respx.mock
+async def test_with_no_browser_the_diff_tab_shows_the_address_of_the_change(
+    clock: VirtualClock, store: Store, client: Client, browser: FakeBrowser
+) -> None:
+    browser.available = False
+    watch_ada(store, clock, unseen=1)
+    serve_compare()
+    app = app_for(clock, store, client)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("3")
+        await pilot.pause()
+        table(app).focus()
+        await pilot.press("d")
+        await finish_work(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == []
+        change = f"https://en.wikipedia.org/w/index.php?diff={ADA_LATEST}&oldid={ADA_PREVIOUS}"
+        assert any("No browser can be opened here" in m and change in m for m in notes(app))
+
+
+@respx.mock
+async def test_the_watchlist_diff_footer_key_opens_what_changed_since_you_last_looked(
+    clock: VirtualClock, store: Store, client: Client
+) -> None:
+    from test_app_shell import click_footer
+
+    watch_ada(store, clock, unseen=1)
+    serve_compare()
+    app = app_for(clock, store, client)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("3")
+        await pilot.pause()
+        table(app).focus()
+        await pilot.pause()
+        await click_footer(pilot, app, "Diff")
+        await finish_work(app, pilot)
+        assert app.query_one(TabbedContent).active == "diff"
+        assert f"Revisions {ADA_PREVIOUS} to {ADA_LATEST}" in app.query_one(DiffTab).text

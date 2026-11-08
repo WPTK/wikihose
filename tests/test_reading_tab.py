@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 import respx
-from support import ListSource, action_api, finish_work, footer_keys, make_app
+from support import FakeBrowser, ListSource, action_api, finish_work, footer_keys, make_app
 from textual.widgets import DataTable, Static
 
 from wikihose.clock import VirtualClock
@@ -289,7 +289,7 @@ async def test_help_on_the_reading_tab_lists_its_keys(clock: VirtualClock) -> No
         await pilot.press("2")
         await pilot.press("question_mark")
         await pilot.pause()
-        assert help_keys(app) == ["r", "n", "w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert help_keys(app) == ["enter", "r", "n", "w", "W", "?", "q", "1-5", "Double", "Tab", "Mouse"]
 
 
 async def test_n_and_r_in_a_replay_keep_the_replay_message(clock: VirtualClock) -> None:
@@ -405,3 +405,36 @@ async def test_wide_numbers_fit_their_columns(clock: VirtualClock) -> None:
             and len(str(table(app).get_cell_at((0, 1)))) <= VIEWS_WIDTH
         )
         assert len(str(table(app).get_cell_at((0, 3)))) <= SPIKE_WIDTH
+
+
+async def test_enter_and_double_click_on_a_reading_row_open_that_page_in_the_browser(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    from test_app_shell import click_footer
+
+    app = reading_app(clock, FakeReading())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        assert app.focused is table(app)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == ["https://en.wikipedia.org/wiki/Page_0"]
+        await pilot.double_click("#reading-table", offset=(10, 3))  # the header is row 0, so this is the third page
+        await pilot.pause()
+        assert browser.opened[1:] == ["https://en.wikipedia.org/wiki/Page_2"]
+        await click_footer(pilot, app, "Open")  # the footer's enter Open does what the key does
+        assert browser.opened[2:] == ["https://en.wikipedia.org/wiki/Page_2"]
+        await pilot.click("#reading-table", offset=(10, 4))  # a single click only moves the cursor
+        await pilot.pause()
+        assert len(browser.opened) == 3
+
+
+async def test_enter_on_an_empty_reading_table_does_nothing(clock: VirtualClock, browser: FakeBrowser) -> None:
+    app = reading_app(clock, FakeReading([]))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == []

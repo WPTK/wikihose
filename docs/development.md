@@ -89,7 +89,8 @@ src/wikihose/
   config.py     the Config dataclass, load_config (warns, never raises) and save_config
   net.py        the shared HTTP client: User-Agent, request budget, retries, disk cache, event stream
   sse.py        the server-sent events parser
-  titles.py     title normalization, article URL parsing and host_for_wiki (enwiki to en.wikipedia.org)
+  titles.py     title normalization, article URL parsing, host_for_wiki (enwiki to en.wikipedia.org), and page_url and
+                diff_url, the addresses Enter opens
   messages.py   plain-words text for a FetchError
   store.py      SQLite storage with versioned migrations (schema version 2: the watchlist columns)
   watchlist_input.py  reading what the user types after w: a title or a pasted article URL
@@ -113,7 +114,9 @@ src/wikihose/
     bars.py       TopBar and HealthBar (which also carries the catch-up progress line)
     bindings.py   declared_bindings: our own bindings, for the help screen and the inventory test
     dialogs.py    help, add a page, stop watching a page, change wiki, edit detail
-    widgets.py    PageTable (a table that can say which page the cursor is on) and spark, the sparkline text
+    widgets.py    PageTable (a table that can say which page the cursor is on, and opens it on Enter or a double click)
+                  and spark, the sparkline text
+    browser.py    can_open_browser (no SSH, no text browser) and open_in_browser, which opens a page or shows its address
     theme.py      the themes
     tabs/         live.py (Live), reading.py (Reading), watchlist.py (Watchlist), diff.py (Diff and the OpenDiff
                   message that asks for one) and convergence.py (Convergence)
@@ -162,7 +165,8 @@ Microsoft's `tui-test`, through `tests/uat_kit/`, a kit vendored from the wxbrie
 commit). It sends the bytes a terminal sends, keys and SGR mouse reports with pointer motion before each click, and
 asserts on the rendered screen; a failed wait fails with a dump of the screen. The journeys run at 80x24 and 120x30:
 start on the Live tab, keys `1` to `5`, clicking each tab label, clicking `Help` in the footer, `?` and Escape, `b` and
-`a`, the replay keys (`+`, space), the too-small cover at 70x20 and back, and `q` exiting with code 0 and leaving no
+`a`, the replay keys (`+`, space), Enter with `SSH_CONNECTION` set (no browser opens; the notice shows the page's
+address), the too-small cover at 70x20 and back, and `q` exiting with code 0 and leaving no
 process. The tests are marked `uat`, so the default run leaves them out; `tests/uat_kit/test_kit.py` (the kit's own
 test, against a tiny echo program) is in the default run and skips itself when tui-test is missing (psutil, which it
 also needs, is a dev dependency).

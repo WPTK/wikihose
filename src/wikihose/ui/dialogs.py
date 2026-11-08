@@ -19,7 +19,7 @@ from wikihose.titles import article_url
 # Help lines that are not key bindings: the shell's tab keys and how focus and the mouse work.
 FIXED_HELP: list[tuple[str, str]] = [
     ("1-5", "Switch tab"),
-    ("Enter", "Open the selected row"),
+    ("Double click", "Open a page on Wikipedia, like Enter"),
     ("Tab", "Move between panes"),
     ("Mouse", "Click tabs, rows, footer keys and buttons"),
 ]
@@ -43,9 +43,10 @@ class HelpScreen(ModalScreen[None]):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label(Content.assemble(("Keys", "bold")))
+            width = max([8, *(len(key) + 2 for key, _ in self.lines)])  # "Double click" is longer than the keys
             with VerticalScroll():
                 for key, text in self.lines:
-                    yield Label(Content.assemble("  ", (f"{key:<8}", "bold $accent"), text), classes="help-line")
+                    yield Label(Content.assemble("  ", (f"{key:<{width}}", "bold $accent"), text), classes="help-line")
             yield Button("Close", id="close")
 
     def on_button_pressed(self) -> None:
