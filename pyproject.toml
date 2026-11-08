@@ -24,7 +24,7 @@ dependencies = [
     "httpx>=0.28,<1",
     "platformdirs>=4,<5",
     "stamina>=26,<27",
-    "hishel>=2,<3",
+    "hishel[httpx]>=2,<3",
     "tomli-w>=1,<2",
     "tzdata>=2024.1; sys_platform == 'win32'",
 ]

@@ -27,19 +27,21 @@ Run these before every pull request. CI runs the same steps on Windows, Linux an
 .venv\Scripts\python -m vulture --min-confidence 80
 .venv\Scripts\python -m pytest -n auto
 .venv\Scripts\python -m wikihose --version
+.venv\Scripts\python -m wikihose --selftest
 ```
 
 Drop `--check` from `ruff format` to rewrite files. Ruff uses a 120 column limit. Mypy requires annotations on every
 function in `src/`. Vulture only reports unused code it is nearly certain about, so a report means a real leftover. Its
 paths are set in `pyproject.toml`, so it needs no arguments.
 
-CONTRIBUTING.md also lists `python -m wikihose --selftest`. That flag does not exist yet and will arrive with the app.
+`--selftest` checks the install without the network (themes, config defaults, the database migration, the bundled sample
+recording and the request budget) and prints `selftest: ok`. It exits 1 and prints `selftest: FAILED (n)` otherwise.
 
 ## CI gates
 
 | Job | What it runs | Blocks merge |
 | --- | --- | --- |
-| Test (windows, ubuntu, macos; Python 3.12 and 3.13) | ruff check, ruff format --check, mypy, vulture, `pytest -n auto`, `python -m wikihose --version` | Yes |
+| Test (windows, ubuntu, macos; Python 3.12 and 3.13) | ruff check, ruff format --check, mypy, vulture, `pytest -n auto`, `python -m wikihose --version`, `python -m wikihose --selftest` | Yes |
 | Test (ubuntu, Python 3.14) | the same steps | No (informational) |
 
 Changes that only touch Markdown under `docs/` or `LICENSE` skip CI. README changes do not. A lowest-dependency job is
@@ -51,21 +53,33 @@ listed in [deferred.md](deferred.md).
 src/wikihose/
   __init__.py   version
   __main__.py   python -m wikihose
-  cli.py        argument parsing and the entry point
+  cli.py        argument parsing (build_parser) and the entry point
+  selftest.py   the checks behind --selftest
+  clock.py      the injectable Clock: SystemClock, VirtualClock (the only place that sleeps)
+  paths.py      config, data, log and cache directories, with env overrides
+  config.py     the Config dataclass, load_config (warns, never raises) and save_config
+  net.py        the shared HTTP client: User-Agent, request budget, retries, disk cache, event stream
+  sse.py        the server-sent events parser
+  titles.py     title normalization and article URL parsing
+  store.py      SQLite storage with versioned migrations
+  sources/      one DataSource interface, two sources
+    events.py     Edit, PageMove, FeedStatus and parse_recentchange
+    protocol.py   the DataSource protocol
+    live.py       the recentchange stream, with reconnects and back-off
+    replay.py     plays a recording back, with pause, speed and skip
+    recording.py  the recording file format: Recorder and read_recording
+  data/         package data: sample.jsonl.gz, the recording used by tests and --selftest
   ui/           screens, widgets and the themes (theme.py)
-  net.py        PR 2: the shared HTTP client, User-Agent, request budget, retries and cache
-  sources/      PR 2: live and replay sources behind one interface
-  store.py      PR 2: SQLite storage
-  config.py     PR 2: the config file
-  paths.py      PR 2: config and data directories
-  clock.py      PR 2: the injectable clock
 ```
 
 ## Tests
 
 - The suite never touches the network. Saved real payloads go in `tests/fixtures/<source>/`, and HTTP is mocked with
   `respx`.
-- Time comes from an injectable clock, never `sleep`.
+- Time comes from an injectable clock, never `sleep`. A test fails if `src/` calls `time.sleep(` or `asyncio.sleep(`
+  outside `clock.py`. `conftest.py` turns stamina's waits off (`stamina.set_testing`).
+- The sample recording lives in the package (`src/wikihose/data/sample.jsonl.gz`) and tests read it through
+  `importlib.resources`; there is no second copy.
 - Every test has a timeout: 60 seconds, set in `pyproject.toml` (`--timeout=0` turns it off). On Windows the plugin
   uses its thread method, which ends the whole pytest process, so a hang fails the run without a summary.
 - Every screen gets a Pilot test, using Textual's `App.run_test()`.

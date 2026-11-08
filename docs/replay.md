@@ -1,0 +1,58 @@
+# Recording and replay
+
+A recording is a saved copy of the recentchange stream. wikihose plays one back at its recorded pace, so a demo, a bug
+report or a test sees exactly the same edits every time. The code is in `src/wikihose/sources/recording.py` (the
+format) and `src/wikihose/sources/replay.py` (playback).
+
+## File format, version 1
+
+A gzipped UTF-8 JSONL file. The first line is the header:
+
+```json
+{"format": "wikihose-recording", "version": 1, "recorded_at": "2026-11-07T12:00:00+00:00", "stream": "recentchange", "wiki": "all"}
+```
+
+- `recorded_at` is the UTC time the recording started. A replay reports `recorded_at` plus the time played so far as its
+  current moment.
+- `wiki` is a wiki database name such as `enwiki` when the recording was filtered to one wiki, otherwise `all`.
+
+Every later line is one server-sent event:
+
+```json
+{"t": 1.234, "id": "[{\"topic\":\"codfw.mediawiki.recentchange\", ...}]", "data": "{\"type\":\"edit\", ...}"}
+```
+
+- `t` is seconds since the recording started (a float).
+- `id` is the event's SSE `id` string, or null. It is stored as sent, so a recording keeps Wikimedia's Kafka positions.
+- `data` is the raw SSE data string, not parsed. Replays parse it with the same code as the live stream.
+
+A reader checks the header, then skips lines that are not valid records and counts them. A recording cut off mid-write
+(a crash) reads up to the cut. A file with a different `format` or `version` is refused.
+
+`src/wikihose/data/sample.jsonl.gz` is a small real recording (48 event lines, one of them
+deliberately broken). It ships in the wheel and is used by the tests and by `--selftest`.
+
+## Recording
+
+`Recorder(path, clock, wiki)` writes the file. It flushes once per second of clock time and when closed, so a crash
+loses at most a second. With a `wiki` it keeps only events whose JSON `wiki` field matches. The live source hands it
+every raw event before parsing, so a recording holds events the app does not use, such as `categorize`, too.
+
+The `--record FILE` flag arrives with the Live tab in the next pull request; it opens a `Recorder` and gives it to the
+live source.
+
+## Replaying
+
+`ReplaySource(path, clock, speed=1.0)` is a `DataSource`, like the live source. Before each event it waits
+`(t - elapsed) / speed` seconds on the injected clock, so tests run on a `VirtualClock` without waiting. It starts with
+an `ok` status and ends with a `down` status whose detail is `replay finished`.
+
+Controls, for the key bindings to call:
+
+- `pause()`, `resume()` and `paused`
+- `speed`, set between 0.5 and 16 (values outside are clamped)
+- `skip(seconds)` jumps forward in recorded time. Events in the skipped span are still yielded, without waiting, so
+  counts and aggregates stay right.
+- `moment()` is the recorded time reached so far, for the clock the screen shows.
+
+`--replay FILE` and its keys (pause, speed up, slow down, skip) arrive with the Live tab in the next pull request.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from textual.color import Color
 from textual.theme import Theme
 
 DARK = Theme(
@@ -35,3 +36,15 @@ LIGHT = Theme(
 )
 
 THEMES = (DARK, LIGHT)
+
+
+def is_orange(colour: str) -> bool:
+    """True for orange: hue 15 to 45 degrees, saturation above 35% and lightness 20% to 85% (see docs/design.md)."""
+    hue, saturation, lightness = Color.parse(colour).hsl
+    return 15 <= hue * 360 <= 45 and saturation > 0.35 and 0.2 <= lightness <= 0.85
+
+
+def orange_roles(theme: Theme) -> list[str]:
+    """The roles among primary, background, surface, panel, warning and accent that are orange (should be none)."""
+    roles = ("primary", "background", "surface", "panel", "warning", "accent")
+    return [role for role in roles if (value := getattr(theme, role)) and is_orange(value)]
