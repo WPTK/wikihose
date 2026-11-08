@@ -490,9 +490,14 @@ class WikihoseApp(App[None]):
 
     # --- replay keys -------------------------------------------------------------------------------------------------
 
+    @property
+    def replaying(self) -> bool:
+        """Whether the source is a recording (``--replay`` or ``--demo``) rather than the live stream."""
+        return isinstance(self.source, ReplaySource)
+
     def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
         if action.startswith("replay_"):
-            return isinstance(self.source, ReplaySource)
+            return self.replaying
         return True
 
     def replay_state(self) -> str:
