@@ -19,6 +19,7 @@ from wikihose.clock import VirtualClock
 from wikihose.headless import run_headless
 from wikihose.sources.recording import demo_recording, read_recording, sample_recording
 from wikihose.sources.replay import ReplaySource
+from wikihose.ui.tabs.live import LiveTab
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -166,10 +167,11 @@ async def test_a_looping_replay_starts_over_with_an_empty_log(clock: VirtualCloc
     rewinds: list[int] = []
     rewind = source.rewind
 
-    def rewind_and_hold() -> None:
-        rewind()
+    def rewind_and_hold() -> bool:
+        ok = rewind()
         source.pause()  # hold the second pass at its start so the empty log can be looked at
         rewinds.append(live_tab(app).stats.total)
+        return ok
 
     source.rewind = rewind_and_hold  # type: ignore[method-assign]
     app = make_app(source, clock, loop_replay=True)
@@ -186,6 +188,81 @@ async def test_a_looping_replay_starts_over_with_an_empty_log(clock: VirtualCloc
         assert not app.replay_finished
         assert str(app.query_one("#topbar-right").render()) == "Recorded data, not live  paused"
         assert source.moment() == source.recorded_start
+
+
+async def test_the_loop_survives_a_dialog_being_open(clock: VirtualClock, sample_path: Path) -> None:
+    from wikihose.ui.dialogs import HelpScreen
+
+    source = ReplaySource(sample_path, clock)
+    rewound: list[bool] = []
+    rewind = source.rewind
+
+    def rewind_and_hold() -> bool:
+        ok = rewind()
+        source.pause()
+        rewound.append(ok)
+        return ok
+
+    source.rewind = rewind_and_hold  # type: ignore[method-assign]
+    app = make_app(source, clock, loop_replay=True)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("question_mark")
+        assert isinstance(app.screen, HelpScreen)
+        for _ in range(1000):
+            if rewound:
+                break
+            await pilot.pause()
+        await pilot.pause()
+        assert rewound == [True]
+        assert app.is_running
+        assert isinstance(app.screen, HelpScreen)
+        assert app._main.query_one(LiveTab).stats.total == 0
+
+
+async def test_a_closed_replay_cannot_be_rewound(
+    clock: VirtualClock, sample_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = ReplaySource(sample_path, clock)
+    await source.aclose()
+    opened: list[object] = []
+    monkeypatch.setattr("wikihose.sources.replay.read_recording", lambda path: opened.append(path))
+    assert source.rewind() is False
+    assert opened == []
+    assert [item async for item in source.items()][-1].state == "down"  # type: ignore[union-attr]
+
+
+async def test_the_demo_does_not_offer_or_allow_a_wiki_change(clock: VirtualClock, sample_path: Path) -> None:
+    source = ReplaySource(sample_path, clock)
+    source.pause()
+    app = make_app(source, clock, loop_replay=True)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        footer = " ".join(str(key.render()) for key in app.query("FooterKey"))
+        assert "Wiki" not in footer
+        assert "Bots" in footer
+        await pilot.press("i")
+        await pilot.pause()
+        assert type(app.screen).__name__ == "MainScreen"
+        await live_tab(app).run_action("pick('wiki')")
+        await pilot.pause()
+        assert type(app.screen).__name__ == "MainScreen"
+
+
+def test_a_demo_that_cannot_be_read_says_so_and_exits_1(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    from contextlib import contextmanager
+
+    bad = tmp_path / "bad.gz"
+    bad.write_bytes(b"nope")
+
+    @contextmanager
+    def broken() -> Any:
+        yield bad
+
+    monkeypatch.setattr("wikihose.sources.recording.demo_recording", broken)
+    assert main(["--demo", "--headless-seconds", "0"]) == 1
+    assert "wikihose:" in capsys.readouterr().err
 
 
 async def test_a_replay_without_the_loop_stays_finished(clock: VirtualClock, sample_path: Path) -> None:

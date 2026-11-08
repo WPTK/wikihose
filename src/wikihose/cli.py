@@ -7,6 +7,7 @@ import asyncio
 import logging
 import sys
 from collections.abc import Sequence
+from contextlib import ExitStack
 from dataclasses import replace
 from pathlib import Path
 
@@ -108,15 +109,15 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
     clock = SystemClock()
     client: Client | None = None
     source: DataSource
-    if args.demo:
-        with demo_recording() as demo_path:
-            source = ReplaySource(
-                demo_path, clock
-            )  # a real file in an installed package, so the path stays good for rewinds
-    elif args.replay is not None:
+    resources = ExitStack()  # keeps the demo file's path valid for the whole run, since the demo rewinds
+    if args.replay is not None or args.demo:
         try:
-            source = ReplaySource(args.replay, clock, speed=args.speed or 1.0)
+            if args.demo:
+                source = ReplaySource(resources.enter_context(demo_recording()), clock)
+            else:
+                source = ReplaySource(args.replay, clock, speed=args.speed or 1.0)
         except (RecordingError, OSError) as exc:
+            resources.close()
             print(f"wikihose: {exc}", file=sys.stderr)
             return 1
     else:
@@ -143,5 +144,6 @@ async def run(args: argparse.Namespace, config: Config, config_path: Path | None
         return 0
     finally:
         await source.aclose()
+        resources.close()
         if client is not None:
             await client.aclose()

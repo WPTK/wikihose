@@ -57,7 +57,7 @@ async def capture() -> str:
         header, _ = read_recording(path)
         clock = ParkingClock(header.recorded_at)
         source = ReplaySource(path, clock)
-    app = WikihoseApp(source, Config(theme="wikihose-dark", wiki="enwiki"), clock=clock, tz=TIMEZONE)
+    app = WikihoseApp(source, Config(theme="wikihose-dark", wiki="enwiki"), clock=clock, tz=TIMEZONE, loop_replay=True)
     async with app.run_test(size=SIZE) as pilot:
         await asyncio.wait_for(_until_parked(clock, pilot), timeout=120)
         tab = app.query_one(LiveTab)

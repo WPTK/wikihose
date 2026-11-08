@@ -63,12 +63,17 @@ class ReplaySource:
         if seconds > 0:
             self._elapsed += seconds
 
-    def rewind(self) -> None:
-        """Start the recording over from the top; call it after ``items()`` has finished, then iterate it again."""
+    def rewind(self) -> bool:
+        """Start the recording over from the top; call it after ``items()`` has finished, then iterate it again.
+
+        Does nothing and returns False once the source is closed.
+        """
+        if self._closed:
+            return False
         self._events.close()
         self._header, self._events = read_recording(self._path)
         self._elapsed = 0.0
-        self._closed = False
+        return True
 
     def moment(self) -> datetime:
         """The recorded time the replay has reached."""

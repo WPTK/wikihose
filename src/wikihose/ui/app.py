@@ -212,8 +212,9 @@ class WikihoseApp(App[None]):
                 self._dispatch(item)
             if not (self.loop_replay and isinstance(self.source, ReplaySource)):
                 return
-            self.source.rewind()
-            self.query_one(LiveTab).start_over()
+            if not self.source.rewind():
+                return  # closed while it played
+            self._main.query_one(LiveTab).start_over()  # not self.query_one: a dialog may be the active screen
             self._main.refresh_top_bar()
 
     def _dispatch(self, item: StreamItem) -> None:
