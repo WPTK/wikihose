@@ -37,7 +37,7 @@ function in `src/`. Vulture only reports unused code it is nearly certain about,
 paths are set in `pyproject.toml`, so it needs no arguments.
 
 `--selftest` checks the install without the network (themes, config defaults, the database migration from version 1 to 2, the bundled sample
-and demo recordings and the request budget) and prints `selftest: ok`. It exits 1 and prints `selftest: FAILED (n)` otherwise.
+and demo recordings, the demo's Reading numbers and the request budget) and prints `selftest: ok`. It exits 1 and prints `selftest: FAILED (n)` otherwise.
 
 `--replay FILE --headless-seconds N` (or `--demo`, the bundled six-minute recording) plays a recording with no screen
 for N seconds of recorded time and prints `edits=..., edits_per_min=..., top=...`. CI runs it on the bundled sample and
@@ -55,6 +55,11 @@ write other captures outside the repo:
 ```powershell
 .venv\Scripts\python scripts\capture_demo.py --size 80x24 --tab 2 --out uat-80x24-reading.svg
 ```
+
+`scripts/capture_demo_reading.py` remakes `src/wikihose/data/demo-reading-enwiki.json.gz`, the Reading numbers
+`--demo` shows on the Reading and Convergence tabs: one day's ranking and the summaries of its top rows and of the
+ranked articles the demo edits. It goes live, about 110 requests 3 seconds apart (six minutes). Remake it together with
+the demo recording, so the day it ranks is the day before the recording.
 
 ## CI gates
 
@@ -78,6 +83,7 @@ src/wikihose/
   convergence.py the Convergence numbers: edits by people per article in 15 minutes, joined with Reading, and the
                 surge trigger's queue (its constants are the product choices: window, surge size, minimum spike)
   selftest.py   the checks behind --selftest
+  demo_reading.py  the Reading numbers recorded with the demo (a ReadingSource that never touches the network)
   clock.py      the injectable Clock: SystemClock, VirtualClock (the only place that sleeps)
   paths.py      config, data, log and cache directories, with env overrides
   config.py     the Config dataclass, load_config (warns, never raises) and save_config
@@ -100,7 +106,8 @@ src/wikihose/
     live.py       the recentchange stream, with reconnects and back-off
     replay.py     plays a recording back, with pause, speed and skip
     recording.py  the recording file format: Recorder and read_recording
-  data/         package data: sample.jsonl.gz (used by tests and --selftest) and demo-enwiki.jsonl.gz (--demo)
+  data/         package data: sample.jsonl.gz (used by tests and --selftest), demo-enwiki.jsonl.gz (--demo) and
+                demo-reading-enwiki.json.gz (the Reading numbers --demo shows)
   ui/           the app and its parts
     app.py        WikihoseApp and MainScreen: top bar, tab strip, health bar, footer, too-small cover
     bars.py       TopBar and HealthBar (which also carries the catch-up progress line)

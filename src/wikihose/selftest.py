@@ -91,6 +91,14 @@ def _demo() -> None:
     assert header.wiki == "enwiki" and count > 1000, f"the demo recording is {header.wiki} with {count} events"
 
 
+def _demo_reading() -> None:
+    from wikihose.demo_reading import read_demo_reading
+
+    snapshot = read_demo_reading()
+    rows = asyncio.run(snapshot.load())
+    assert snapshot.day is not None and len(rows) >= 25, f"the demo's Reading numbers have {len(rows)} rows"
+
+
 def _replay() -> None:
     edits, moves = _sample_counts()
 
@@ -134,6 +142,7 @@ CHECKS: list[tuple[str, Callable[[], None]]] = [
     ("sample events parse", _parse),
     ("replay of the sample", _replay),
     ("demo recording is there", _demo),
+    ("demo Reading numbers are there", _demo_reading),
     ("request budget admits 150, then waits", _budget),
 ]
 

@@ -128,6 +128,14 @@ def reading_factory(client: Client | None, clock: Clock) -> Factory | None:
     return make
 
 
+def demo_reading_factory() -> Factory:
+    """The demo's recorded Reading numbers, for English Wikipedia (the demo's only wiki)."""
+    from wikihose.demo_reading import read_demo_reading
+
+    snapshot = read_demo_reading()
+    return lambda wiki: snapshot if wiki == DEMO_WIKI else None
+
+
 async def run(args: argparse.Namespace, config: Config, config_path: Path | None) -> int:
     """Build the data source the arguments ask for, then run the app (or the headless summary) on it."""
     with ExitStack() as resources:  # keeps the demo file's path valid for the whole run, since the demo rewinds
@@ -176,7 +184,7 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
                 clock=clock,
                 store=store,
                 config_path=config_path,
-                reading=reading_factory(client, clock),
+                reading=demo_reading_factory() if args.demo else reading_factory(client, clock),
                 client=client,
                 loop_replay=args.demo,
                 saved_watchlist=saved,
