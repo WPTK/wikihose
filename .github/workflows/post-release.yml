@@ -1,0 +1,152 @@
+name: Post-release
+
+# Checks a published release the way a user would: installs the version from PyPI with pipx and runs the published
+# Windows executable, each in a clean runner, then runs --version and --selftest. A failure means the release is
+# broken for users. It publishes nothing.
+#
+# Triggers: `release: published` fires for releases made by a person. The Release workflow creates its release with
+# GITHUB_TOKEN, and GitHub does not start workflows from that token's events, so this also runs when the Release
+# workflow finishes (`workflow_run`). A manual run takes the tag as input.
+
+on:
+  release:
+    types: [published]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to check, for example v0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-release-${{ github.event.release.tag_name || github.event.workflow_run.head_branch || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Resolve the tag
+    # A workflow_run for a failed Release run published nothing, so there is nothing to check.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+      version: ${{ steps.t.outputs.version }}
+    steps:
+      - id: t
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${RELEASE_TAG:-${RUN_TAG:-$INPUT_TAG}}"
+          if ! printf '%s' "$tag" | grep -Eq '^v0\.[0-9]+\.[0-9]+$'; then
+            echo "::error::'$tag' is not a v0.MINOR.PATCH release tag"; exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+  assets:
+    name: Published files and checksums
+    needs: tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      VERSION: ${{ needs.tag.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download every published file from its public URL
+        run: |
+          mkdir dl && cd dl
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          curl -fsSL --retry 3 -O "$base/SHA256SUMS"
+          expected=$(awk '{print $2}' SHA256SUMS | sed 's/^\*//')
+          [ -n "$expected" ] || { echo "::error::SHA256SUMS lists no files"; exit 1; }
+          for f in $expected; do curl -fsSL --retry 3 -O "$base/$f" || { echo "::error::cannot download $f from $base"; exit 1; }; done
+          # Everything the release holds is listed in SHA256SUMS, and the other way round.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -vx SHA256SUMS | sort > ../published.txt
+          printf '%s\n' $expected | sort > ../listed.txt
+          diff ../published.txt ../listed.txt || { echo "::error::SHA256SUMS and the published files differ"; exit 1; }
+      - name: Verify SHA256SUMS
+        run: cd dl && sha256sum -c SHA256SUMS
+      - name: Verify the build provenance attestation of each file
+        run: |
+          cd dl
+          for f in $(awk '{print $2}' SHA256SUMS | sed 's/^\*//'); do
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" || { echo "::error::no valid attestation for $f"; exit 1; }
+          done
+      - name: Check the wheel, sdist and executable are for this version
+        run: |
+          cd dl
+          ls "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz" "wikihose-$VERSION-windows-x86_64.exe"
+
+  pipx:
+    name: pipx install from PyPI (${{ matrix.os }})
+    needs: tag
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      VERSION: ${{ needs.tag.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pipx
+      # PyPI can take a few minutes to list a new upload, so retry for up to ten minutes.
+      - name: Install the released version
+        run: |
+          for attempt in $(seq 1 20); do
+            if python -m pipx install --pip-args="--no-cache-dir" "wikihose==$VERSION"; then exit 0; fi
+            echo "attempt $attempt: wikihose==$VERSION is not installable yet; waiting 30s"; sleep 30
+          done
+          echo "::error::wikihose==$VERSION never became installable from PyPI"; exit 1
+      - name: Run it
+        run: |
+          python -m pipx ensurepath >/dev/null
+          export PATH="$HOME/.local/bin:$PATH"
+          out=$(wikihose --version); echo "$out"
+          [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
+          wikihose --selftest
+
+  exe:
+    name: Published Windows executable
+    needs: tag
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      TAG: ${{ needs.tag.outputs.tag }}
+      VERSION: ${{ needs.tag.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # No checkout and no Python step: the executable must run on a runner with nothing of ours installed.
+      - name: Download the published file and verify its checksum
+        run: |
+          mkdir bin && cd bin
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          name="wikihose-$VERSION-windows-x86_64.exe"
+          curl -fsSL --retry 3 -O "$base/SHA256SUMS"
+          curl -fsSL --retry 3 -O "$base/$name" || { echo "::error::cannot download $name"; exit 1; }
+          grep -F " $name" SHA256SUMS > one.sum || { echo "::error::$name is not listed in SHA256SUMS"; exit 1; }
+          sha256sum -c one.sum
+          cp "$name" wikihose.exe
+      - name: Run it
+        working-directory: bin
+        run: |
+          out=$(./wikihose.exe --version); echo "$out"
+          [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
+          ./wikihose.exe --selftest
