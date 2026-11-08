@@ -20,6 +20,11 @@ from wikihose.paths import config_dir
 WIKI_PATTERN = re.compile(r"[a-z_]+wiki")
 
 
+def is_valid_wiki(name: str) -> bool:
+    """True for a database name such as enwiki or zh_min_nanwiki, and for nothing else (no markup, no spaces)."""
+    return WIKI_PATTERN.fullmatch(name) is not None
+
+
 @dataclass(frozen=True)
 class Config:
     wiki: str = "enwiki"
@@ -36,7 +41,7 @@ def default_config_path() -> Path:
 
 def _valid(name: str, value: Any) -> bool:
     if name == "wiki":
-        return isinstance(value, str) and WIKI_PATTERN.fullmatch(value) is not None
+        return isinstance(value, str) and is_valid_wiki(value)
     if name == "min_bytes":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
     if name in ("hide_bots", "articles_only"):

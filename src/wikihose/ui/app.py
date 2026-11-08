@@ -248,9 +248,9 @@ class WikihoseApp(App[None]):
     def watch_page(self, wiki: str, title: str) -> None:
         shown = page_key(wiki, title)[1]
         if self.watchlist.add(wiki, title):
-            self.notify(f"Watching {shown}", timeout=3)
+            self.notify(f"Watching {shown}", timeout=3, markup=False)
         else:
-            self.notify(f"Already watching {shown}", timeout=3)
+            self.notify(f"Already watching {shown}", timeout=3, markup=False)
 
     # --- help --------------------------------------------------------------------------------------------------------
 
@@ -337,4 +337,4 @@ class WikihoseApp(App[None]):
             on_disk, _ = load_config(self.config_path)
             save_config(replace(on_disk, **changes), self.config_path)
         except OSError as exc:
-            self.notify(f"Could not save settings: {exc}", severity="warning")
+            self.notify(f"Could not save settings: {exc}", severity="warning", markup=False)

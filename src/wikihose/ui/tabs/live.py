@@ -13,6 +13,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.content import Content
+from textual.markup import escape
 from textual.message import Message
 from textual.widgets import DataTable, Sparkline, Static
 
@@ -245,6 +246,7 @@ class LiveTab(Vertical):
         table = self.query_one("#log", PageTable)
         keep = table.cursor_key()
         at_top = table.cursor_row == 0
+        scroll = table.scroll_y  # a redraw every quarter second must not throw the reader back to the top
         table.clear(columns=True)
         for label, width in self._columns:
             table.add_column(label, width=width, key=label)
@@ -253,7 +255,9 @@ class LiveTab(Vertical):
             self._edits[key] = edit
             table.add_row(*self._row_cells(key, edit), key=key)
         if keep in self._edits and not at_top:
-            table.move_cursor(row=table.get_row_index(keep), animate=False)
+            table.move_cursor(row=table.get_row_index(keep), animate=False, scroll=False)
+        if scroll:
+            self.call_after_refresh(table.scroll_to, y=scroll, animate=False, immediate=True)
 
     def _row_cells(self, key: str, edit: Edit) -> list[Text]:
         cells = self._cells.get(key)
@@ -355,7 +359,7 @@ class LiveTab(Vertical):
 
     def _draw_filters(self) -> None:
         def word(what: str, text: str) -> str:
-            return f"[$primary @click=pick('{what}')]{text}[/]"
+            return f"[$primary @click=pick('{what}')]{escape(text)}[/]"
 
         parts = [
             word("wiki", self.wiki),
@@ -375,7 +379,9 @@ class LiveTab(Vertical):
             "size": self.action_cycle_size,
             "pause": self.action_toggle_pause,
         }
-        actions[event.what]()
+        action = actions.get(event.what)
+        if action is not None:  # an unknown word does nothing
+            action()
 
     def _filters_changed(self) -> None:
         self._draw_filters()

@@ -8,6 +8,10 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 _WHITESPACE = re.compile(r"\s+")
 _HOST = re.compile(r"^(?P<lang>[a-z][a-z0-9-]*)(?:\.m)?\.(?P<project>wikipedia|wiktionary)\.org$")
 _WIKI_NAMES = {"wikipedia": "wiki", "wiktionary": "wiktionary"}
+_WIKIMEDIA_HOST = re.compile(
+    r"[a-z0-9-]+(\.[a-z0-9-]+)*\.(wikipedia|wiktionary|wikibooks|wikiquote|wikisource|wikinews|wikiversity|wikivoyage"
+    r"|wikimedia|wikidata|mediawiki)\.org"
+)
 _URL_SAFE = "/:()_,!*~@$;=+-."  # left unencoded in article links, as Wikipedia writes them
 
 
@@ -55,12 +59,16 @@ def title_from_url(text: str) -> tuple[str, str] | None:
     return page_key(wiki, title)
 
 
-def article_url(server_name: str, wiki: str, title: str) -> str:
+def valid_host(host: str) -> bool:
+    """True only for a plain lowercase Wikimedia host such as en.wikipedia.org. The event's server_name is untrusted."""
+    return _WIKIMEDIA_HOST.fullmatch(host) is not None
+
+
+def article_url(server_name: str, title: str) -> str | None:
     """The article's address, such as https://en.wikipedia.org/wiki/Ada_Lovelace (spaces become underscores).
 
-    ``server_name`` comes from the event; when it is empty the host is worked out from the database name.
+    None when ``server_name`` is not a Wikimedia host, so a hostile event can never put its own text into a link.
     """
-    host = server_name
-    if not host:
-        host = f"{wiki.removesuffix('wiki').replace('_', '-')}.wikipedia.org"
-    return f"https://{host}/wiki/{quote(title.replace(' ', '_'), safe=_URL_SAFE)}"
+    if not valid_host(server_name):
+        return None
+    return f"https://{server_name}/wiki/{quote(title.replace(' ', '_'), safe=_URL_SAFE)}"

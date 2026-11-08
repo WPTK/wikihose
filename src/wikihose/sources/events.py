@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import KW_ONLY, dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
+
+from wikihose.titles import valid_host
 
 type FeedState = Literal["ok", "connecting", "reconnecting", "rate_limited", "bad_data", "down"]
 
@@ -94,12 +97,30 @@ def _int(value: Any, *, optional: bool = False) -> int | None:
     return value
 
 
+# Text from the stream is written by strangers and ends up on a terminal, so it is cleaned once, here. Control
+# characters (which could start an escape sequence) become U+FFFD, a tab becomes a space, and the characters that
+# reorder text (bidirectional overrides and isolates) are dropped.
+_CONTROL = re.compile("[\x00-\x08\x0a-\x1f\x7f-\x9f]")
+_BIDI = re.compile("[\u202a-\u202e\u2066-\u2069]")
+
+
+def clean_text(text: str) -> str:
+    """``text`` with control and bidirectional characters removed or replaced, as described above."""
+    return _CONTROL.sub("\ufffd", _BIDI.sub("", text.replace("\t", " ")))
+
+
 def _str(value: Any, default: str | None = None) -> str:
     if value is None and default is not None:
         return default
     if not isinstance(value, str):
         raise _Malformed
-    return value
+    return clean_text(value)
+
+
+def _host(value: Any) -> str:
+    """The event's server_name if it is a plain Wikimedia host, else an empty string (no link will be shown)."""
+    host = value if isinstance(value, str) else ""
+    return host if valid_host(host) else ""
 
 
 def _bool(value: Any, default: bool) -> bool:
@@ -142,7 +163,7 @@ def _edit(data: dict[str, Any], kind: Literal["edit", "new"]) -> Edit:
         rev_new=_pair(data.get("revision"), "new"),
         comment=_str(data.get("comment"), ""),
         at=_when(data.get("timestamp")),
-        server_name=_str(data.get("server_name"), ""),
+        server_name=_host(data.get("server_name")),
     )
 
 

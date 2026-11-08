@@ -41,7 +41,7 @@ INVENTORY: dict[str, str] = {
     "binding:WikihoseApp:plus:replay_faster": "test_replay_keys_pause_speed_and_skip",
     "binding:WikihoseApp:minus:replay_slower": "test_replay_keys_pause_speed_and_skip",
     "binding:WikihoseApp:right_square_bracket:replay_skip": "test_replay_keys_pause_speed_and_skip",
-    "binding:LiveTab:b:toggle_bots": "test_a_toggle_refills_the_log_from_the_last_edits",
+    "binding:LiveTab:b:toggle_bots": "test_b_hides_and_shows_bot_edits",
     "binding:LiveTab:a:toggle_articles": "test_a_toggle_refills_the_log_from_the_last_edits",
     "binding:LiveTab:m:cycle_size": "test_size_key_cycles_through_the_steps",
     "binding:LiveTab:i:change_wiki": "test_i_switches_wiki_and_starts_the_numbers_over",
@@ -52,18 +52,18 @@ INVENTORY: dict[str, str] = {
     "binding:WikiPrompt:escape:dismiss(None)": "test_the_wiki_dialog_cancels_with_escape",
     "binding:EditDetail:escape:dismiss": "test_edit_detail_is_not_a_help_screen_and_closes_with_escape",
     # Footer labels, per mode
-    "footer:live:Bots": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:live:Articles": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:live:Size": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:live:Wiki": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:live:Pause": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:live:Watch": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:live:Help": "test_clicking_help_in_the_footer_opens_help",
-    "footer:live:Quit": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:replay:Play": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:replay:Faster": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:replay:Slower": "test_footer_shows_the_replay_keys_only_in_a_replay",
-    "footer:replay:Skip": "test_footer_shows_the_replay_keys_only_in_a_replay",
+    "footer:live:Bots": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Articles": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Size": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Wiki": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Pause": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Watch": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Help": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Quit": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:replay:Play": "test_clicking_each_replay_footer_key_does_what_its_key_does",
+    "footer:replay:Faster": "test_clicking_each_replay_footer_key_does_what_its_key_does",
+    "footer:replay:Slower": "test_clicking_each_replay_footer_key_does_what_its_key_does",
+    "footer:replay:Skip": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     # Help lines
     "help:b": "test_help_lists_the_active_keys_in_live_mode",
     "help:a": "test_help_lists_the_active_keys_in_live_mode",
@@ -79,7 +79,7 @@ INVENTORY: dict[str, str] = {
     "help:]": "test_help_lists_the_replay_keys_only_in_a_replay",
     "help:1-5": "test_help_lists_the_active_keys_in_live_mode",
     "help:Enter": "test_enter_on_a_log_row_opens_the_detail_with_the_article_link",
-    "help:Tab": "test_focus_follows_the_open_tab",
+    "help:Tab": "test_tab_moves_the_focus_between_the_log_and_the_top_table",
     "help:Mouse": "test_clicking_a_log_row_opens_its_detail",
     # Mouse actions
     "click:pick": "test_clicking_the_filter_words_does_what_the_keys_do",
@@ -101,38 +101,47 @@ def _ui_classes() -> list[type]:
     return list(found.values())
 
 
-def collected() -> set[str]:
-    keys: set[str] = set()
+def collected() -> dict[str, list[str]]:
+    """Every input, with the words a test for it must contain (a key name, a label, or a click word)."""
+    found: dict[str, list[str]] = {}
     for cls in _ui_classes():
         for binding in _own_bindings(cls):
-            keys.add(f"binding:{cls.__name__}:{binding.key}:{binding.action}")
+            found[f"binding:{cls.__name__}:{binding.key}:{binding.action}"] = _key_words(binding)
     for cls in (WikihoseApp, LiveTab):
         for binding in declared_bindings(cls):
             if binding.show:
                 mode = "replay" if binding.action.startswith("replay_") else "live"
-                keys.add(f"footer:{mode}:{binding.description}")
+                found[f"footer:{mode}:{binding.description}"] = [binding.description]
             if not binding.action.startswith("tab("):
-                keys.add(f"help:{key_label(binding)}")
-    keys.update(f"help:{key}" for key, _ in FIXED_HELP)
+                found[f"help:{key_label(binding)}"] = [*_key_words(binding), binding.tooltip or binding.description]
+    for key, text in FIXED_HELP:
+        found[f"help:{key}"] = ["click"] if key == "Mouse" else [key.lower(), text]
     for path in (ROOT / "src" / "wikihose").rglob("*.py"):
-        keys.update(f"click:{action}" for action in re.findall(r"@click=(\w+)", path.read_text(encoding="utf-8")))
-    return keys
+        for action in re.findall(r"@click=(\w+)", path.read_text(encoding="utf-8")):
+            found[f"click:{action}"] = ["click"]
+    return found
 
 
-def existing_tests() -> set[str]:
-    names: set[str] = set()
+def _key_words(binding: Binding) -> list[str]:
+    """What a test calls the key: Textual's key name, the character shown for it, or the action it runs."""
+    return [binding.key, binding.key_display or binding.key, binding.action.split("(")[0]]
+
+
+def source_of_tests() -> dict[str, str]:
+    """The source text of every test function under tests/, by name."""
+    found: dict[str, str] = {}
     for path in (ROOT / "tests").rglob("test_*.py"):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        names.update(
-            node.name
-            for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith("test_")
-        )
-    return names
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith("test_"):
+                first = min([node.lineno, *(d.lineno for d in node.decorator_list)])  # the decorators name the cases
+                found[node.name] = found.get(node.name, "") + " ".join(lines[first - 1 : node.end_lineno])
+    return found
 
 
 def test_every_input_has_an_entry() -> None:
-    missing = sorted(collected() - INVENTORY.keys())
+    missing = sorted(collected().keys() - INVENTORY.keys())
     assert not missing, f"inputs with no test in INVENTORY: {missing}"
 
 
@@ -143,8 +152,21 @@ def test_no_entry_is_stale() -> None:
 
 
 def test_every_entry_names_a_real_test() -> None:
-    tests = existing_tests()
+    tests = source_of_tests()
     bad = sorted(
         f"{key} -> {name}" for key, name in INVENTORY.items() if not name.startswith("manual:") and name not in tests
     )
     assert not bad, f"INVENTORY entries naming tests that do not exist: {bad}"
+
+
+def test_every_named_test_mentions_its_input() -> None:
+    """A test named for a key must contain that key (or its label, or its help text), so a rename cannot hollow it out."""
+    tests = source_of_tests()
+    found = collected()
+    hollow = []
+    for key, name in INVENTORY.items():
+        if name.startswith("manual:") or key not in found or name not in tests:
+            continue
+        if not any(word in tests[name] for word in found[key]):
+            hollow.append(f"{key} -> {name} (looked for any of {found[key]})")
+    assert not hollow, "tests that never mention the input they are listed for: " + "; ".join(sorted(hollow))

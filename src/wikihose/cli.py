@@ -12,7 +12,7 @@ from pathlib import Path
 
 from wikihose import __version__
 from wikihose.clock import SystemClock
-from wikihose.config import WIKI_PATTERN, Config, default_config_path, load_config
+from wikihose.config import Config, default_config_path, is_valid_wiki, load_config
 from wikihose.paths import db_path, log_dir
 
 
@@ -68,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from wikihose.selftest import run_selftest
 
         return run_selftest()
-    if args.wiki is not None and not WIKI_PATTERN.match(args.wiki):
+    if args.wiki is not None and not is_valid_wiki(args.wiki):
         parser.error(f"--wiki {args.wiki!r} is not a wiki name; use something like enwiki or dewiki")
     if args.replay is not None and args.record is not None:
         parser.error("--replay and --record cannot be used together")

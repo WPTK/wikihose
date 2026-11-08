@@ -12,7 +12,7 @@ from textual.screen import ModalScreen
 from textual.style import Style
 from textual.widgets import Button, Input, Label, Static
 
-from wikihose.config import WIKI_PATTERN
+from wikihose.config import is_valid_wiki
 from wikihose.sources.events import Edit
 from wikihose.titles import article_url
 
@@ -94,7 +94,7 @@ class WikiPrompt(ModalScreen[str | None]):
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         name = event.value.strip().lower()
-        if WIKI_PATTERN.match(name):
+        if is_valid_wiki(name):
             self.dismiss(name)
         else:
             self.query_one("#wiki-error", Static).update("Use a wiki name like enwiki or dewiki.")
@@ -118,8 +118,9 @@ class EditDetail(ModalScreen[None]):
         self.tz = tz
 
     @property
-    def url(self) -> str:
-        return article_url(self.edit.server_name if self.edit else "", self.wiki, self.title_text)
+    def url(self) -> str | None:
+        """The article link, or None when the event did not name a Wikimedia host."""
+        return article_url(self.edit.server_name, self.title_text) if self.edit else None
 
     def compose(self) -> ComposeResult:
         edit = self.edit
@@ -133,8 +134,10 @@ class EditDetail(ModalScreen[None]):
                 yield self._line("Time", edit.at.astimezone(self.tz).strftime("%a %d %b %Y %H:%M:%S %Z"))
                 yield self._line("Bytes", f"{edit.delta:+,}" + ("  (new page)" if edit.kind == "new" else ""))
                 yield self._line("Summary", edit.comment or "(none)")
-            link = Content.assemble((f"{'Link':<8}", "$text-muted"), (self.url, Style(link=self.url, underline=True)))
-            yield Label(link, id="link")
+            url = self.url
+            if url is not None:
+                link = Content.assemble((f"{'Link':<8}", "$text-muted"), (url, Style(link=url, underline=True)))
+                yield Label(link, id="link")
             yield Button("Close", id="close")
 
     @staticmethod
