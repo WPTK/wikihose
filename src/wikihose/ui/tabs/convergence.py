@@ -247,7 +247,7 @@ class ConvergenceTab(Vertical):
                 "Convergence needs the Reading numbers, and they need a live connection: they are not available in "
                 f"a replay or for this wiki.\n\n{rule}"
             )
-        if self._reading_error:
+        if self._reading_error and not self._reading_seen:  # rows from an earlier load still count
             return f"The Reading numbers did not load. The Reading tab (2) says: {self._reading_error}\n\n{rule}"
         if not self._reading_seen:
             return f"Waiting for the Reading numbers…\n\n{rule}"
