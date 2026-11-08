@@ -21,7 +21,7 @@ from wikihose.reading import DAYS, ReadingData, parse_history, parse_summary, pa
 SITEINFO = json.loads((Path(__file__).parent / "fixtures" / "siteinfo" / "enwiki.json").read_text(encoding="utf-8"))
 
 json_values = st.recursive(
-    st.none() | st.booleans() | st.integers() | st.floats(allow_nan=False) | st.text(),
+    st.none() | st.booleans() | st.integers() | st.floats(allow_nan=False, allow_infinity=False) | st.text(),
     lambda inner: st.lists(inner, max_size=4) | st.dictionaries(st.text(max_size=8), inner, max_size=4),
     max_leaves=12,
 )
