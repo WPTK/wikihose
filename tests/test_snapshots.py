@@ -112,6 +112,7 @@ def watch_app(*, populated: bool) -> WikihoseApp:
 async def open_tab(pilot: Any, key: str) -> None:
     await pilot.press(key)
     await pilot.pause()
+    await pilot.wait_for_animation()  # the tab strip's underline slides to the new tab; capture it at rest
     await pilot.pause()
 
 
@@ -123,6 +124,10 @@ async def populated_watchlist(pilot: Any) -> None:
 
 async def empty_watchlist(pilot: Any) -> None:
     await open_tab(pilot, "3")
+    # Nothing in the empty tab can take the focus, so where it lands after the switch (the tab strip or nowhere)
+    # depends on timing. Pin it, or the footer and the tab highlight differ from run to run.
+    pilot.app.screen.set_focus(None)
+    await pilot.pause()
 
 
 async def shown_diff(pilot: Any) -> None:
@@ -134,6 +139,7 @@ async def shown_diff(pilot: Any) -> None:
     )
     tab.state = "shown"
     tab._set(render_diff(parse_diff("enwiki", 1383337217, 1384127064, payload), header, tz=EASTERN))
+    await pilot.wait_for_animation()
     await pilot.pause()
 
 
