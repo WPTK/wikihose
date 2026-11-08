@@ -53,7 +53,7 @@ def test_start_shows_the_live_tab(start: Start) -> None:
 
 def test_number_keys_switch_tabs(start: Start) -> None:
     term = start()
-    for key, label in zip("12345", TABS, strict=True):
+    for key, label in zip("2345", TABS[1:], strict=True):  # it starts on Live, so 1 is pressed last
         term.send_keys(key)
         term.wait_for(SHOWN[label], 10, f"the {label} tab after pressing {key}")
     term.send_keys("1")
@@ -119,20 +119,42 @@ def test_too_small_window_says_so_and_clears(start: Start, size: tuple[int, int]
     term.wait_for(lambda s: "Make the window bigger" not in s and SHOWN["Live"](s), 10, "the Live tab back")
 
 
+CONSOLE_HOSTS = ("conhost.exe", "openconsole.exe")  # Windows keeps these until the terminal closes
+
+
+def program_processes() -> list[psutil.Process]:
+    """Every process this test started, found after the app is up (a PyInstaller exe starts its real child late)."""
+    found = []
+    for proc in psutil.Process().children(recursive=True):
+        try:
+            if proc.name().lower() not in CONSOLE_HOSTS:
+                found.append(proc)
+        except psutil.NoSuchProcess:
+            continue
+    return found
+
+
+def still_running(procs: list[psutil.Process]) -> list[psutil.Process]:
+    _gone, alive = psutil.wait_procs(procs, timeout=5)
+    running = []
+    for proc in alive:
+        try:
+            if proc.status() != psutil.STATUS_ZOMBIE:  # exited, not yet reaped
+                running.append(proc)
+        except psutil.NoSuchProcess:
+            continue
+    return running
+
+
 def test_q_exits_with_code_zero_and_the_process_is_gone(start: Start) -> None:
     term = start()
-    # The kit's pids are the program's launcher and children; on Windows they include the console host, which tui-test
-    # keeps until the terminal is closed, so leave it out.
-    program: list[psutil.Process] = []
-    for pid in term._pids:
-        proc = psutil.Process(pid)
-        if proc.name().lower() not in ("conhost.exe", "openconsole.exe"):
-            program.append(proc)
+    term.wait_for(SHOWN["Live"], 10, "the Live tab")
+    program = program_processes()
     assert program, "no program process found"
     term.send_keys("q")
     assert term.wait_exit(10) == 0, term.screen_text()
-    _gone, alive = psutil.wait_procs(program, timeout=5)
-    assert not alive, f"still running after q: {alive}\n{term.screen_text()}"
+    running = still_running(program)
+    assert not running, f"still running after q: {running}\n{term.screen_text()}"
 
 
 @pytest.mark.parametrize("key", ["1", "2", "3", "4", "5"])
@@ -140,5 +162,8 @@ def test_every_tab_stays_alive_for_a_while(start: Start, key: str) -> None:
     """A tab that crashes on its first redraw would show up as an exited program, not a wrong screen."""
     term = start()
     term.send_keys(key)
+    label = TABS["12345".index(key)]
+    term.wait_for(SHOWN[label], 10, f"the {label} tab")
     term.hold(2)
     assert term.alive(), term.screen_text()
+    assert SHOWN[label](term.screen()), term.screen_text()

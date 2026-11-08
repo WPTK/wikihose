@@ -157,7 +157,7 @@ asserts on the rendered screen; a failed wait fails with a dump of the screen. T
 start on the Live tab, keys `1` to `5`, clicking each tab label, clicking `Help` in the footer, `?` and Escape, `b` and
 `a`, the replay keys (`+`, space), the too-small cover at 70x20 and back, and `q` exiting with code 0 and leaving no
 process. The tests are marked `uat`, so the default run leaves them out; `tests/uat_kit/test_kit.py` (the kit's own
-test, against a tiny echo program) is in the default run and skips itself when tui-test is missing.
+test, against a tiny echo program) is in the default run and skips itself when tui-test is missing (psutil, which it also needs, is a dev dependency).
 
 ```powershell
 .venv\Scripts\python -m pytest tests/realterm -m uat -n 4
