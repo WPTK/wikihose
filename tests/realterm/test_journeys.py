@@ -78,9 +78,9 @@ def test_clicking_help_in_the_footer_opens_help_and_escape_closes_it(start: Star
 def test_question_mark_lists_the_keys(start: Start) -> None:
     term = start()
     term.send_keys("?")
-    screen = term.wait_for(lambda s: HELP_LINE in s, 10, "the help screen")
-    for text in ("Switch tab", "Quit wikihose", "Pause or resume the replay"):
-        assert text in screen, screen.text
+    wanted = ("Switch tab", "Quit wikihose", "Pause or resume the replay")
+    # wait for the whole list, not just its first line: the help screen can draw over more than one frame
+    term.wait_for(lambda s: HELP_LINE in s and all(text in s for text in wanted), 10, "the help screen with its keys")
     close_help(term)
     term.send_keys("?")
     term.wait_for(lambda s: HELP_LINE in s, 10, "the help screen again")

@@ -12,6 +12,5 @@ One line per known gap, in the form `- Area: what is missing and what would fix 
 - Watchlist: non-article titles are caught offline by a list of English namespace names, and the wiki's answer settles the rest; `NamespaceFilter` (localized names from siteinfo) is not used there yet.
 - Watchlist: `d` and `m` mean different things on the Live tab (`d` shows the diff of the selected edit, `m` sets the minimum size) and on the Watchlist tab (`d` removes the page, `m` marks it seen); a consistent scheme needs a key review.
 - Replay: `w` and `W` need a connection to look a page up, so in a replay they say so; the saved watchlist is copied read-only for live matching, but a replay cannot add pages.
-- Replay: at 80x24 the footer cuts off the `+ - ]` keys; the help screen (`?`) lists them all.
 - Replay: the saved watchlist is read as an immutable snapshot (no migration, no lock files), so a database written by an older or newer wikihose, or one being written at that moment, gives an empty list in a replay.
 - Watchlist: a page with no pageview data (404) is asked for again after a restart; only a page that has data is cached in `pageviews`.

@@ -116,6 +116,23 @@ async def footer_keys(pilot: Any, app: WikihoseApp, *, needing: str | None = Non
     raise AssertionError(f"the footer never showed a key containing {needing!r}; it shows {seen}")
 
 
+async def settled_footer_keys(pilot: Any, app: WikihoseApp) -> list[Any]:
+    """The footer's keys once the rebuild after a tab change is done: every key laid out and the same set twice running.
+
+    Right after a tab change the old tab's keys can still be there with no width, so a label every tab shows (Quit) is
+    not enough to know the new footer is in.
+    """
+    previous: list[str] = []
+    for _ in range(100):
+        await pilot.pause()
+        keys = list(app.query("FooterKey"))
+        labels = [str(k.render()) for k in keys]
+        if keys and all(k.region.width > 0 for k in keys) and labels == previous:
+            return keys
+        previous = labels
+    raise AssertionError(f"the footer never settled; it shows {previous}")
+
+
 def footer_text(keys: list[Any]) -> str:
     return " ".join(str(k.render()) for k in keys)
 

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from wikihose.cli import demo_reading_factory
 from wikihose.clock import VirtualClock
 from wikihose.config import Config
 from wikihose.sources.recording import demo_recording, read_recording
@@ -61,7 +62,9 @@ async def capture(size: tuple[int, int] = SIZE, tab: int | None = None) -> str:
         header, _ = read_recording(path)
         clock = ParkingClock(header.recorded_at)
         source = ReplaySource(path, clock)
-    app = WikihoseApp(source, Config(theme="wikihose-dark", wiki="enwiki"), clock=clock, tz=TIMEZONE, loop_replay=True)
+    config = Config(theme="wikihose-dark", wiki="enwiki")
+    reading = demo_reading_factory()  # what --demo shows on the Reading and Convergence tabs
+    app = WikihoseApp(source, config, clock=clock, tz=TIMEZONE, loop_replay=True, reading=reading)
     async with app.run_test(size=size) as pilot:
         await asyncio.wait_for(_until_parked(clock, pilot), timeout=120)
         live = app.query_one(LiveTab)
@@ -70,6 +73,8 @@ async def capture(size: tuple[int, int] = SIZE, tab: int | None = None) -> str:
         app.query_one(TopBar).refresh_text()
         if tab is not None:
             await pilot.press(str(tab))
+            for _ in range(50):  # the recorded Reading numbers load in a worker; the stream's own never ends
+                await pilot.pause()
         await pilot.pause()
         return app.export_screenshot(title=TITLE)
 

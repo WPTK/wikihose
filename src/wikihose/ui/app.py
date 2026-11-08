@@ -195,8 +195,19 @@ class WikihoseApp(App[None]):
         Binding("q", "quit", "Quit", tooltip="Quit wikihose"),
         # Replay keys: only active when the source is a replay (see check_action).
         Binding("space", "replay_pause", "Play", key_display="space", tooltip="Pause or resume the replay"),
-        Binding("plus", "replay_faster", "Faster", key_display="+", tooltip="Play the replay faster (up to 16x)"),
-        Binding("minus", "replay_slower", "Slower", key_display="-", tooltip="Play the replay slower (down to 0.5x)"),
+        # + and - stay out of the footer so the replay footer fits 80 columns; ? help lists them and the top bar
+        # shows the speed.
+        Binding(
+            "plus", "replay_faster", "Faster", key_display="+", show=False, tooltip="Play the replay faster (up to 16x)"
+        ),
+        Binding(
+            "minus",
+            "replay_slower",
+            "Slower",
+            key_display="-",
+            show=False,
+            tooltip="Play the replay slower (down to 0.5x)",
+        ),
         Binding(
             "right_square_bracket",
             "replay_skip",

@@ -80,8 +80,6 @@ INVENTORY: dict[str, str] = {
     "footer:reading:Refresh": "test_footer_keys_refresh_and_rows_work_when_clicked",
     "footer:reading:Rows": "test_footer_keys_refresh_and_rows_work_when_clicked",
     "footer:replay:Play": "test_clicking_each_replay_footer_key_does_what_its_key_does",
-    "footer:replay:Faster": "test_clicking_each_replay_footer_key_does_what_its_key_does",
-    "footer:replay:Slower": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     "footer:replay:Skip": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     # Help lines
     "help:b": "test_help_lists_the_active_keys_in_live_mode",
