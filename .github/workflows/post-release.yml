@@ -60,45 +60,31 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
-  assets:
-    name: Published files and checksums
+  # The shared workflow downloads every published file, checks SHA256SUMS and each attestation (signed by this
+  # repository's release.yml), then runs each binary on a runner of its own kind with nothing of ours installed.
+  published:
+    name: Published files and binaries
     needs: tag
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     permissions:
       contents: read
       attestations: read
-    env:
-      TAG: ${{ needs.tag.outputs.tag }}
-      VERSION: ${{ needs.tag.outputs.version }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Download every published file from its public URL
-        run: |
-          mkdir dl && cd dl
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
-          curl -fsSL --retry 3 -O "$base/SHA256SUMS"
-          expected=$(awk '{print $2}' SHA256SUMS | sed 's/^\*//')
-          [ -n "$expected" ] || { echo "::error::SHA256SUMS lists no files"; exit 1; }
-          for f in $expected; do curl -fsSL --retry 3 -O "$base/$f" || { echo "::error::cannot download $f from $base"; exit 1; }; done
-          # Everything the release holds is listed in SHA256SUMS, and the other way round.
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -vx SHA256SUMS | sort > ../published.txt
-          printf '%s\n' $expected | sort > ../listed.txt
-          diff ../published.txt ../listed.txt || { echo "::error::SHA256SUMS and the published files differ"; exit 1; }
-      - name: Verify SHA256SUMS
-        run: cd dl && sha256sum -c SHA256SUMS
-      - name: Verify the build provenance attestation of each file
-        run: |
-          cd dl
-          for f in $(awk '{print $2}' SHA256SUMS | sed 's/^\*//'); do
-            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$TAG" || { echo "::error::no valid attestation for $f"; exit 1; }
-          done
-      - name: Check the wheel, sdist and executable are for this version
-        run: |
-          cd dl
-          for f in "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz" "wikihose-$VERSION-windows-x86_64.exe" "wikihose-$VERSION-linux-x86_64.tar.gz" "wikihose-$VERSION-linux-arm64.tar.gz" "wikihose-$VERSION-macos-arm64.tar.gz" "wikihose-$VERSION-macos-x86_64.tar.gz"; do
-            [ -f "$f" ] || { echo "::error::$f is not among the published files"; exit 1; }
-          done
+    uses: WPTK/release-workflows/.github/workflows/verify-published.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+      app: wikihose
+      asset-prefix: wikihose-${{ needs.tag.outputs.version }}
+      expected-files: |
+        wikihose-${{ needs.tag.outputs.version }}.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-py3-none-any.whl
+        wikihose-${{ needs.tag.outputs.version }}-windows-x86_64.exe
+        wikihose-${{ needs.tag.outputs.version }}-linux-x86_64.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-linux-arm64.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-macos-arm64.tar.gz
+        wikihose-${{ needs.tag.outputs.version }}-macos-x86_64.tar.gz
+      smoke-command: |
+        out=$("$BIN" --version); echo "$out"
+        [ "$out" = "wikihose ${{ needs.tag.outputs.version }}" ] || { echo "::error::expected 'wikihose ${{ needs.tag.outputs.version }}'"; exit 1; }
+        "$BIN" --selftest
 
   pipx:
     name: pipx install from PyPI (${{ matrix.os }})
@@ -134,50 +120,3 @@ jobs:
           out=$(wikihose --version); echo "$out"
           [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
           wikihose --selftest
-
-  binary:
-    name: Published binary (${{ matrix.name }})
-    needs: tag
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - {name: windows-x86_64, os: windows-latest, ext: .exe}
-          - {name: linux-x86_64, os: ubuntu-latest, ext: .tar.gz}
-          - {name: linux-arm64, os: ubuntu-24.04-arm, ext: .tar.gz}
-          - {name: macos-arm64, os: macos-latest, ext: .tar.gz}
-          - {name: macos-x86_64, os: macos-15-intel, ext: .tar.gz}
-    env:
-      TAG: ${{ needs.tag.outputs.tag }}
-      VERSION: ${{ needs.tag.outputs.version }}
-      NAME: wikihose-${{ needs.tag.outputs.version }}-${{ matrix.name }}${{ matrix.ext }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      # No checkout and no Python step: the binary must run on a runner with nothing of ours installed.
-      - name: Download the published file and verify its checksum
-        run: |
-          mkdir bin && cd bin
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
-          curl -fsSL --retry 3 -O "$base/SHA256SUMS"
-          curl -fsSL --retry 3 -O "$base/$NAME" || { echo "::error::cannot download $NAME"; exit 1; }
-          grep -F " $NAME" SHA256SUMS > one.sum || { echo "::error::$NAME is not listed in SHA256SUMS"; exit 1; }
-          if command -v sha256sum >/dev/null; then sha256sum -c one.sum; else shasum -a 256 -c one.sum; fi
-      # A downloaded archive has no quarantine flag here, so this checks the file itself, not Gatekeeper.
-      - name: Unpack it
-        run: |
-          cd bin
-          case "$NAME" in
-            *.exe) cp "$NAME" wikihose.exe ;;
-            *.tar.gz) tar -xzf "$NAME"; test -x wikihose || { echo "::error::the archive holds no executable wikihose"; exit 1; } ;;
-          esac
-      - name: Run it
-        working-directory: bin
-        run: |
-          bin=./wikihose; if [ "$RUNNER_OS" = Windows ]; then bin=./wikihose.exe; fi
-          out=$("$bin" --version); echo "$out"
-          [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
-          "$bin" --selftest

@@ -46,19 +46,19 @@ jobs" on the run; do not retag. PyPI refuses a second upload of the same version
 | --- | --- | --- |
 | `release.yml` | `verify` | The tagged commit must be on `main` and have a successful `ci.yml` run. The tag must be `v0.MINOR.PATCH`, equal `v` plus `__version__`, and `CHANGELOG.md` must have a dated section with entries. That section becomes the release notes. |
 | | `build` | Calls `build.yml` (below). |
-| | `publish` | Collects the files, writes `SHA256SUMS`, attests build provenance for each file, and creates the GitHub release. Only this job can write to the repository. |
+| | `attest` | Attests build provenance for each file. It runs in this workflow, not the shared one, because the certificate names the workflow that ran it and `gh attestation verify --signer-workflow` expects `release.yml`. |
+| | `publish` | Calls the shared `publish-release.yml` (after the shared `check-release.yml` has checked the file set and the tag, and `attest` has run): checks the file set is exactly the seven expected again, writes `SHA256SUMS`, confirms the tag still points at the built commit and creates the GitHub release. Only this job can write to the repository. |
 | | `pypi` | After the release exists and the `pypi` environment is approved, uploads the wheel and sdist that `build` made (not rebuilt) by trusted publishing. |
 | `build.yml` | `dist` | Builds the sdist and wheel, installs each in a clean venv and runs `--version` and `--selftest`. |
-| | `binary` | Builds one binary per platform with PyInstaller (`scripts/build_binary.py`): Windows, Linux and macOS, x86_64 and arm64, each on its own kind of runner. Runs `--version`, `--selftest` and `--demo --headless-seconds 5` on the result, then names it `wikihose-<version>-<os>-<arch>` (`.exe` on Windows, `.tar.gz` elsewhere, so the executable bit survives). |
-| `post-release.yml` | `assets` | Downloads every published file from its public URL, checks `SHA256SUMS` and each build attestation. |
+| | `binary` | Calls the shared `build-binaries.yml`, which builds one binary per platform with PyInstaller (`scripts/build_binary.py`): Windows, Linux and macOS, x86_64 and arm64, each on its own kind of runner. Runs `--version`, `--selftest` and `--demo --headless-seconds 5` on the result, then names it `wikihose-<version>-<os>-<arch>` (`.exe` on Windows, `.tar.gz` elsewhere, so the executable bit survives). |
+| `post-release.yml` | `published` | Calls the shared `verify-published.yml`: downloads every published file from its public URL, checks `SHA256SUMS` and each build attestation, then on a runner of each platform with nothing of ours installed runs the published binary (`--version`, `--selftest`). |
 | | `pipx` | On Ubuntu and Windows runners, `pipx install wikihose==<version>` from PyPI, then `--version` and `--selftest`. |
-| | `binary` | On a runner of each platform with nothing of ours installed, downloads the published binary, checks its checksum, then runs `--version` and `--selftest`. |
 
 `build.yml` also runs by hand (Actions tab, Run workflow) and on pull requests that touch the build, which is how the
 build is proved without a release. It publishes nothing and has no secrets. `post-release.yml` can be run by hand
 against an existing tag (input `tag`).
 
-All third-party actions are pinned to a commit SHA. Dependencies for the builds, including the
+The shared workflows live in [WPTK/release-workflows](https://github.com/WPTK/release-workflows) (also used by the other WPTK apps) and are pinned by commit SHA in `build.yml`, `release.yml` and `post-release.yml`; to take a change, move the SHA in all three together. All third-party actions are pinned to a commit SHA. Dependencies for the builds, including the
 build backend (hatchling), are pinned by `.github/release-constraints.txt`, so a dependency release between two tags cannot change what ships.
 
 ## Build a binary locally

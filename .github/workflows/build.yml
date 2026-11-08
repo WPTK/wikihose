@@ -58,76 +58,38 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  # One binary per platform, each built on its own kind of machine (PyInstaller cannot cross-compile). The Linux builds
-  # run inside python:3.12-bullseye, pinned by digest, so the binaries need only glibc 2.31 and run on Ubuntu 20.04 and
-  # newer, Debian 11 and newer and the like; building on the runner itself would set the floor at that runner's glibc.
-  # Move the pin on purpose. macos-15-intel is GitHub's last Intel image (macos-13 is retired). Files Linux and macOS
-  # make are tar.gz archives, because an artifact upload drops the executable bit and an archive keeps it.
-  binary:
-    name: Binary (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-    # Empty for the jobs that run straight on the runner; GitHub treats '' as "no container".
-    container: ${{ matrix.container }}
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: windows-x86_64
-            os: windows-latest
-          - name: linux-x86_64
-            os: ubuntu-latest
-            container: python:3.12-bullseye@sha256:7cc929040c5e8cf6036c5099d62a83708427c131fb7a7c965b5ba51e995eea1c
-          - name: linux-arm64
-            os: ubuntu-24.04-arm
-            container: python:3.12-bullseye@sha256:7cc929040c5e8cf6036c5099d62a83708427c131fb7a7c965b5ba51e995eea1c
-          - name: macos-arm64
-            os: macos-latest
-          - name: macos-x86_64
-            os: macos-15-intel
+  version:
+    name: Read the version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        if: matrix.container == ''
-        with:
-          python-version: "3.12"
-      # tzdata is in the package's own dependencies on Windows only; a binary may land on a system with no zone files, so
-      # every binary carries its own.
-      - name: Install
-        shell: bash
-        run: python -m pip install -c .github/release-constraints.txt . tzdata "pyinstaller>=6.22,<7"
-      - name: Build, then run --version, --selftest and a headless demo on the result
-        shell: bash
-        run: python scripts/build_binary.py
-      # The floor is claimed in the README, so prove it: no symbol newer than glibc 2.31 may be needed.
-      - name: Check the glibc floor
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          newest=$(objdump -T dist/wikihose | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
-          echo "newest glibc symbol needed: $newest"
-          [ "$(printf '%s\n' GLIBC_2.31 "$newest" | sort -V | tail -1)" = GLIBC_2.31 ] || { echo "::error::needs $newest, newer than the 2.31 floor"; exit 1; }
-      - name: Name the file
-        shell: bash
-        env:
-          NAME: ${{ matrix.name }}
+      - id: v
         run: |
           version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/wikihose/__init__.py)
-          mkdir out
-          if [ "$RUNNER_OS" = Windows ]; then
-            cp dist/wikihose.exe "out/wikihose-$version-$NAME.exe"
-          else
-            tar -C dist -czf "out/wikihose-$version-$NAME.tar.gz" wikihose
-            listing=$(tar -tvzf "out/wikihose-$version-$NAME.tar.gz")
-            echo "$listing"
-            echo "$listing" | grep -Eq '^-rwx.* wikihose$' || { echo "::error::the archive lost the executable bit"; exit 1; }
-          fi
-          ls -l out
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: binary-${{ matrix.name }}
-          path: out/*
-          if-no-files-found: error
-          retention-days: 7
+          [ -n "$version" ] || { echo "::error::no __version__ in src/wikihose/__init__.py"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  # One binary per platform, built by the shared workflow (WPTK/release-workflows). The Linux builds run inside
+  # python:3.12-bullseye, pinned by digest, so the binaries need only glibc 2.31 (Ubuntu 20.04, Debian 11 and newer);
+  # building on the runner itself would set the floor at that runner's glibc. Move the pin on purpose. The macOS Intel
+  # build uses GitHub's last Intel image (macos-13 is retired). Assets: wikihose-<version>-<os>-<arch>, .exe on Windows
+  # and .tar.gz elsewhere. tzdata is in the package's own dependencies on Windows only; a binary may land on a system
+  # with no zone files, so every binary carries its own.
+  binary:
+    name: Binary
+    needs: version
+    uses: WPTK/release-workflows/.github/workflows/build-binaries.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
+    with:
+      app: wikihose
+      asset-prefix: wikihose-${{ needs.version.outputs.version }}
+      linux-container: python:3.12-bullseye@sha256:7cc929040c5e8cf6036c5099d62a83708427c131fb7a7c965b5ba51e995eea1c
+      # PIP_CONSTRAINT is set here because a called workflow does not inherit this file's env: it pins the isolated build
+      # environment (hatchling) too, which -c does not.
+      install-command: PIP_CONSTRAINT="$PWD/.github/release-constraints.txt" python -m pip install . tzdata "pyinstaller>=6.22,<7"
+      build-command: python scripts/build_binary.py --no-smoke
+      smoke-command: python scripts/build_binary.py --smoke-only
