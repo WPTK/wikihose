@@ -14,7 +14,7 @@ import psutil
 import pytest
 from uat_kit import Screen, Terminal
 
-Start = Callable[[], Terminal]
+Start = Callable[..., Terminal]
 TABS = ["Live", "Reading", "Watchlist", "Diff", "Convergence"]
 HELP_LINE = "Hide or show bot edits"  # a line of the help screen; Live has no such text
 EDIT_ROW = re.compile(r"\d\d:\d\d:\d\d\s+[+-][\d,]+\s+\S")  # a log row: time, bytes, article
@@ -98,6 +98,19 @@ def test_b_and_a_toggle_the_filter_line(start: Start) -> None:
     term.wait_for(lambda s: "all pages" in filter_line(s), 10, "all pages after a")
     term.send_keys("b", "a")
     term.wait_for(lambda s: filter_line(s) == before, 10, "the filter line back as it was")
+
+
+def test_enter_over_ssh_shows_the_address_instead_of_opening_a_browser(start: Start) -> None:
+    """SSH_CONNECTION makes the program treat the browser as out of reach, so no browser opens on the machine running
+    this test; Enter on the first log row shows the page's address in a notice instead."""
+    term = start(env={"SSH_CONNECTION": "192.0.2.1 50000 192.0.2.2 22"})
+    term.wait_for(lambda s: bool(EDIT_ROW.search(s.text)), 20, "edits in the log")
+    term.send_keys("enter")
+    term.wait_for(
+        lambda s: "No browser can be opened here" in s and "https://en.wikipedia.org/wiki/" in s,
+        10,
+        "the notice with the page's address after Enter",
+    )
 
 
 def test_replay_keys_change_the_speed_and_pause(start: Start) -> None:

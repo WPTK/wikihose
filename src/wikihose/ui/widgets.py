@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from textual import events
+from textual.binding import Binding
+from textual.message import Message
 from textual.widgets import DataTable
+from textual.widgets.data_table import RowKey
 
 BARS = "▁▂▃▄▅▆▇█"
 
@@ -25,11 +29,53 @@ def spark(series: tuple[int, ...], width: int) -> str:
 
 
 class PageTable(DataTable[Any]):
-    """A table whose rows are Wikipedia pages. The shell asks it for the page under the cursor (the ``w`` key)."""
+    """A table whose rows are Wikipedia pages. The shell asks it for the page under the cursor (the ``w`` key, unless
+    ``watchable`` is False, as on the Watchlist tab, where ``w`` types a new page).
 
-    def __init__(self, resolve: Callable[[str], tuple[str, str] | None], **kwargs: Any) -> None:
+    Enter, and a double click on a row, post ``Open`` and the shell opens that page in the web browser. A single click
+    only moves the cursor.
+    """
+
+    class Open(Message):
+        """The reader asked to open the page under the cursor on its wiki."""
+
+        def __init__(self, table: PageTable) -> None:
+            super().__init__()
+            self.table = table
+
+        @property
+        def control(self) -> PageTable:
+            return self.table
+
+    # Two bindings for the one key, as the app has for space: exactly one is enabled (see check_action). Only the first
+    # shows in the footer, so a tab whose footer is already full can drop the label and keep the key.
+    BINDINGS = [
+        Binding(
+            "enter",
+            "open_page",
+            "Open",
+            key_display="enter",  # Textual draws the key as a return glyph; every other key in the footer is a word
+            tooltip="Open the selected page on Wikipedia",
+        ),
+        Binding(
+            "enter",
+            "open_page_quiet",
+            "Open",
+            key_display="enter",
+            show=False,
+            tooltip="Open the selected page on Wikipedia",
+        ),
+    ]
+
+    show_open_in_footer: bool = True
+
+    def __init__(
+        self, resolve: Callable[[str], tuple[str, str] | None], *, watchable: bool = True, **kwargs: Any
+    ) -> None:
         super().__init__(**kwargs)
         self._resolve = resolve
+        self._pressed_row: RowKey | None = None
+        self.watchable = watchable  # whether ``w`` watches the page under the cursor (not on the list of watched pages)
 
     def page_at_cursor(self) -> tuple[str, str] | None:
         """``(wiki, title)`` of the row under the cursor, or None when the table is empty."""
@@ -40,3 +86,43 @@ class PageTable(DataTable[Any]):
         if not self.row_count:
             return None
         return self.coordinate_to_cell_key(self.cursor_coordinate).row_key.value
+
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if action == "open_page":
+            return self.show_open_in_footer
+        if action == "open_page_quiet":
+            return not self.show_open_in_footer
+        return super().check_action(action, parameters)
+
+    def set_open_in_footer(self, show: bool) -> None:
+        """Show the ``enter Open`` label in the footer or leave it out (the key works either way)."""
+        if show != self.show_open_in_footer:
+            self.show_open_in_footer = show
+            self.refresh_bindings()
+
+    def action_open_page(self) -> None:
+        self._open()
+
+    def action_open_page_quiet(self) -> None:
+        self._open()
+
+    def _open(self) -> None:
+        if self.page_at_cursor() is not None:
+            self.post_message(self.Open(self))
+
+    def on_click(self, event: events.Click) -> None:
+        """Open the page on a double click, when both clicks landed on the same row.
+
+        This is ``on_click`` and not ``_on_click`` because Textual runs every class's ``_on_click``, so overriding that
+        name and calling ``super()`` would run DataTable's handler twice. DataTable's own handler still moves the
+        cursor. Textual counts a chain by screen position only, and a live table can put another row under the pointer
+        between the two clicks, so the row is remembered at the first click and compared at the second.
+        """
+        meta = event.style.meta
+        row, column = meta.get("row", -1), meta.get("column", -1)
+        key = self.ordered_rows[row].key if 0 <= row < len(self.ordered_rows) and column >= 0 else None
+        if event.chain == 1:
+            self._pressed_row = key
+        elif event.chain == 2 and key is not None and key == self._pressed_row:
+            self.move_cursor(row=row)  # rows added after the first click may have moved the cursor off it
+            self._open()

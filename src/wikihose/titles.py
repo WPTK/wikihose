@@ -93,3 +93,23 @@ def article_url(server_name: str, title: str) -> str | None:
     if not valid_host(server_name):
         return None
     return f"https://{server_name}/wiki/{quote(title.replace(' ', '_'), safe=_URL_SAFE)}"
+
+
+def page_url(wiki: str, title: str) -> str | None:
+    """The address of a page on its own wiki, such as https://de.wikipedia.org/wiki/Z%C3%BCrich for ``("dewiki",
+    "Zürich")``. None when the wiki has no known web host (``commonswiki``, say).
+    """
+    host = host_for_wiki(wiki)
+    if host is None:
+        return None
+    return article_url(host, page_key(wiki, title)[1])
+
+
+def diff_url(wiki: str, from_rev: int, to_rev: int) -> str | None:
+    """The address of the change between two revisions, such as https://en.wikipedia.org/w/index.php?diff=2&oldid=1.
+    None when the wiki has no known web host.
+    """
+    host = host_for_wiki(wiki)
+    if host is None:
+        return None
+    return f"https://{host}/w/index.php?diff={int(to_rev)}&oldid={int(from_rev)}"

@@ -16,7 +16,7 @@ from textual.containers import Horizontal, Vertical
 from textual.content import Content
 from textual.markup import escape
 from textual.message import Message
-from textual.widgets import DataTable, Sparkline, Static
+from textual.widgets import Sparkline, Static
 
 from wikihose.clock import Clock
 from wikihose.config import Config
@@ -118,11 +118,12 @@ class LiveTab(Vertical):
     BINDINGS = [
         Binding("b", "toggle_bots", "Bots", tooltip="Hide or show bot edits"),
         Binding("a", "toggle_articles", "Articles", tooltip="Show only articles, or every kind of page"),
-        Binding("m", "cycle_size", "Size", tooltip="Cycle the smallest change shown: any, 100, 1,000 bytes"),
+        Binding("s", "cycle_size", "Size", tooltip="Cycle the smallest change shown: any, 100, 1,000"),
         Binding("i", "change_wiki", "Wiki", tooltip="Type another wiki to watch, such as dewiki"),
         Binding("d", "show_diff", "Diff", tooltip="Show what the selected edit changed"),
+        Binding("e", "edit_details", "Details", show=False, tooltip="Show the details of the selected edit"),
         # "Hold", not "Pause": in a replay, space is the Pause key (and Hold keeps that footer inside 80 columns)
-        Binding("p", "toggle_pause", "Hold", tooltip="Hold the log still or let it run (the numbers keep counting)"),
+        Binding("p", "toggle_pause", "Hold", tooltip="Hold the log still or let it run"),
     ]
 
     DEFAULT_CSS = """
@@ -186,6 +187,10 @@ class LiveTab(Vertical):
         self._subscribe(self.accept)
         self._watchlist.subscribe_members(self._watchlist_changed)
         top = self.query_one("#top", PageTable)
+        if getattr(self.app, "replaying", False):
+            # The Live footer in a replay is 79 of 80 columns without it: the key works, its label is left out.
+            top.set_open_in_footer(False)
+            self.query_one("#log", PageTable).set_open_in_footer(False)
         top.add_column("Edits", width=TOP_EDITS_WIDTH, key="Edits")
         top.add_column("Article", width=TOP_TITLE_WIDTH, key="Article")
         self._draw_filters()
@@ -518,27 +523,30 @@ class LiveTab(Vertical):
             )
             self.post_message(OpenDiff(DiffRequest(edit.wiki, edit.rev_old, edit.rev_new, header)))
 
-    def _edit_under_cursor(self) -> Edit | None:
+    def _cursor_table(self) -> PageTable:
+        """The table the reader is in: Most edited when it has the focus, otherwise the log."""
         focused = self.app.focused
-        table = self.query_one("#top" if focused is not None and focused.id == "top" else "#log", PageTable)
+        return self.query_one("#top" if focused is not None and focused.id == "top" else "#log", PageTable)
+
+    def _edit_under_cursor(self) -> Edit | None:
+        table = self._cursor_table()
         key = table.cursor_key()
         if key is None:
             return None
         return self._stats.latest(key) if table.id == "top" else self._edits.get(key)
 
-    # --- opening a row -----------------------------------------------------------------------------------------------
+    # --- the details of an edit --------------------------------------------------------------------------------------
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        event.stop()
-        key = event.row_key.value
+    def action_edit_details(self) -> None:
+        """Open the details box for the edit under the cursor: that edit in the log, the latest one in Most edited."""
+        table = self._cursor_table()
+        key = table.cursor_key()
         if key is None:
             return
-        if event.data_table.id == "log":
-            edit = self._edits.get(key)
-            if edit is not None:
-                self.app.push_screen(EditDetail(edit.wiki, page_key(edit.wiki, edit.title)[1], edit, self._tz))
-        elif event.data_table.id == "top":
+        if table.id == "top":
             self.app.push_screen(EditDetail(self.wiki, key, self._stats.latest(key), self._tz))
+        elif (edit := self._edits.get(key)) is not None:
+            self.app.push_screen(EditDetail(edit.wiki, page_key(edit.wiki, edit.title)[1], edit, self._tz))
 
     # --- for tests and the shell -------------------------------------------------------------------------------------
 

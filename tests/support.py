@@ -144,3 +144,11 @@ async def finish_work(app: WikihoseApp, pilot: Any) -> None:
     """Wait for the app's background workers (adding a page, the catch-up, a diff) and let the screen settle."""
     await app.workers.wait_for_complete()
     await pilot.pause()
+
+
+class FakeBrowser:
+    """Stands in for the reader's web browser: records the addresses the app asked to open."""
+
+    def __init__(self) -> None:
+        self.opened: list[str] = []
+        self.available = True  # what ``can_open_browser`` answers; a test sets False for the no-browser path

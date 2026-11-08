@@ -62,17 +62,18 @@ walkthrough step that proves it on the exe.
 | 6 | `w` on any article row adds it to the Watchlist, as does typing a title or pasting a URL. | `test_w_on_a_log_row_adds_that_article`, `test_w_on_a_top_row_adds_that_article`, `test_w_on_a_reading_row_watches_that_page`, `test_the_table_takes_the_focus_and_w_names_the_page_at_the_cursor` (Convergence: it checks the page `w` gets; the add is the shared path the other tests cover), `test_the_dialog_reads_a_pasted_wikipedia_url`, `test_w_on_the_same_page_twice_says_so_and_does_not_double_count`; W2 |
 | 7 | Live edits to watched pages are highlighted and the Watchlist tab shows a count badge. | `test_live_edits_to_watched_pages_count_as_unseen_without_any_request`, `test_a_watched_edit_is_marked_in_the_log_and_others_are_not`, `test_the_tab_lists_each_page_with_its_unseen_count_and_the_badge_adds_them_up`; W3 |
 | 8 | On start, edits made while the app was closed are caught up. | `test_the_catch_up_runs_after_startup_and_feeds_the_badge`, `tests/test_catchup.py`; W4 |
-| 9 | Enter on a tracked edit shows a red/green diff. | `test_enter_opens_the_diff_from_the_revision_last_seen_and_marks_the_page_seen`, `test_added_lines_are_green_and_marked_with_a_plus`, `test_removed_lines_are_red_with_a_minus`; D1, D2 |
+| 9 | `d` on a Live edit or a watched page shows a red/green diff. | `test_d_opens_the_diff_from_the_revision_last_seen_and_marks_the_page_seen`, `test_added_lines_are_green_and_marked_with_a_plus`, `test_removed_lines_are_red_with_a_minus`; D1, D2 |
 | 10 | Convergence ranks articles hot in both Live and Reading; the surge trigger fetches history on its own. | `test_ranked_by_edits_times_spike_and_only_when_hot_in_both`, `test_opening_the_tab_loads_reading_and_ranks_the_overlap`, `test_a_surge_fetches_history_once_and_joins_the_list`, `test_spike_of_fetches_one_history_and_caches_it`; C2, C3 |
 | 11 | `--demo` works with no network. | `test_demo_headless_opens_no_socket` and `test_the_demo_app_opens_no_socket_on_any_tab` (every connection and name lookup blocked at the socket), `test_demo_headless_runs_with_no_network`; G2 |
 | 12 | `--version` and `--selftest` work, offline. | `test_version_prints_and_exits_zero`, `test_selftest_exits_zero_and_prints_ok`; `build.yml` runs both on the exe; smoke-test.md section 1 |
 | 13 | Works at 80x24 with nothing scrolling sideways; a too-small window gets a message that clears on resize. | `test_columns_follow_the_width_and_nothing_scrolls_sideways`, `test_columns_fit_without_sideways_scrolling` (Reading), `test_the_columns_fit_without_scrolling_sideways` (Convergence), `test_too_small_covers_the_screen_and_clears_on_resize`; real-terminal resize journey; G3 |
-| 14 | `?` help lists only real bindings; every footer key is clickable; the mouse works on rows, tabs and buttons. | `tests/uat/test_inventory.py` (every key, footer label, help line and click has a test), `test_clicking_each_live_footer_key_does_what_its_key_does`, `test_clicking_a_tab_switches_to_it`, `test_clicking_a_log_row_opens_its_detail`; real-terminal mouse journey; G4 |
+| 14 | `?` help lists only real bindings; every footer key is clickable; the mouse works on rows, tabs and buttons. | `tests/uat/test_inventory.py` (every key, footer label, help line and click has a test), `test_clicking_each_live_footer_key_does_what_its_key_does`, `test_clicking_a_tab_switches_to_it`, `test_clicking_a_log_row_only_moves_the_cursor`; real-terminal mouse journey; G4 |
 | 15 | A failing feed is named with its reason in a bar above the footer, and the bar clears on recovery. | `test_health_bar_shows_a_failing_feed_and_hides_on_recovery`, `test_a_failed_load_says_why` (Reading), `test_a_rate_limited_surge_waits_and_is_tried_again`; G5 |
 | 16 | The app is described as unofficial, and the README and `--help` say so. | `test_help_says_unofficial`; README review (manual) |
-| 17 | Panes showing Wikipedia text link to the article. | `test_enter_on_a_log_row_opens_the_detail_with_the_article_link`, `test_the_diff_always_shows_the_address_of_the_article`; R3, D2 |
+| 17 | Panes showing Wikipedia text link to the article. | `test_e_on_a_log_row_opens_the_detail_with_the_article_link`, `test_the_diff_always_shows_the_address_of_the_article`; R3, D2 |
 | 18 | Orange is never a primary color or a background. | `tests/test_colours.py` (themes, every snapshot and docs SVG, the source) |
 | 19 | It installs with `pipx` from PyPI and as a Windows exe, and from 0.2.0 as macOS and Linux binaries. | smoke-test.md sections 1, 1b and 2; `post-release.yml` (after the tag) |
+| 20 | Enter or a double click on a row opens that page on Wikipedia in the browser, on every tab with rows; on the Diff tab it opens the change; with no browser the address is shown. | `test_page_url`, `test_diff_url_names_the_newer_revision_as_the_diff_and_the_older_as_oldid`, `tests/test_browser.py` (`can_open_browser`), `test_enter_on_a_log_row_opens_that_page_in_the_browser`, `test_double_click_on_a_log_row_opens_that_page_in_the_browser`, `test_enter_and_double_click_on_a_reading_row_open_that_page_in_the_browser`, `test_enter_and_double_click_on_a_watched_page_open_it_in_the_browser`, `test_enter_and_double_click_on_a_convergence_row_open_that_page_in_the_browser`, `test_enter_and_double_click_on_the_diff_open_the_change_on_wikipedia`, `test_with_no_browser_the_address_is_shown_instead`; real-terminal Enter-over-SSH journey; G7 |
 
 ## State matrix
 
@@ -88,7 +89,7 @@ Each cell names what shows, and the test or step that saw it. "Snapshot" means a
 | Filtered to nothing | Empty log with the filter line still showing: `test_b_hides_and_shows_bot_edits` | n/a | n/a | n/a | n/a |
 | Feed failing (the bar names it) | Health bar: `test_health_bar_shows_a_failing_feed_and_hides_on_recovery` | Status line says why: `test_a_failed_load_says_why` | Trend says why: `test_a_failed_request_says_so_in_words_and_leaves_a_dash` | `test_a_diff_that_cannot_be_loaded_says_why_in_plain_words_and_leaves_the_page_unseen` | Reading failed: says so and points to the Reading tab (`test_the_empty_tab_says_why`); a surge fetch failed: `test_a_surge_that_cannot_reach_wikimedia_waits_a_minute`, `test_bad_data_for_one_surge_moves_on_to_the_next` |
 | Rate limited (Retry-After honored) | n/a (one stream) | "rate limited, retrying in Ns": `test_a_failed_load_says_why`, `test_a_rate_limit_retry_is_cancelled_by_a_wiki_change` | `test_a_rate_limited_request_says_when_it_will_retry` | `test_fetch_failures_are_plain_errors` | `test_a_rate_limited_surge_waits_and_is_tried_again` |
-| Recovered (the bar clears) | `test_health_bar_shows_a_failing_feed_and_hides_on_recovery` | `r` loads again: `test_r_fetches_again` | `test_a_rate_limited_fill_retries_after_the_delay` | The next Enter loads again (walkthrough D1) | `test_a_rate_limited_surge_waits_and_is_tried_again` |
+| Recovered (the bar clears) | `test_health_bar_shows_a_failing_feed_and_hides_on_recovery` | `r` loads again: `test_r_fetches_again` | `test_a_rate_limited_fill_retries_after_the_delay` | The next `d` loads again (walkthrough D1) | `test_a_rate_limited_surge_waits_and_is_tried_again` |
 | Offline (a replay or `--demo`) | Plays the recording: `test_demo_headless_runs_with_no_network` | Replay: "needs a live connection" (`test_a_replay_has_no_reading_data`); demo: the recorded ranking (`test_the_demo_fills_the_reading_tab`) | `w` says it needs a connection: `test_w_in_a_replay_says_it_needs_a_connection` | n/a (needs a connection; says so) | Replay: "needs the Reading numbers"; demo: the recorded ranking (`test_the_demo_fills_the_convergence_tab`) |
 | Replay: paused, fast, skip | `test_replay_keys_pause_speed_and_skip`; real-terminal replay journey | n/a | n/a | n/a | n/a |
 | Very long or non-Latin titles | Cut with an ellipsis, cleaned: `tests/test_hardening.py` | `test_a_long_summary_is_cut_with_an_ellipsis_inside_the_pane`, `test_wide_numbers_fit_their_columns` | Titles cut with an ellipsis (walkthrough W5 with a long title) | `test_highlight_offsets_are_utf8_bytes_so_text_after_a_wide_character_lines_up` | Long titles cut with an ellipsis: `test_the_columns_fit_without_scrolling_sideways`; `test_spike_of_uses_the_top_list_figure_and_handles_no_data` refuses a lone surrogate |
@@ -113,6 +114,8 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 - G5. With the network off in a normal (not demo) run, the bar above the footer names the failing feed and why, and
   clears when the network is back.
 - G6. Open Task Manager: memory stays flat over ten minutes of Live (no steady climb).
+- G7. On the Live log, Enter (and a double click) on a row opens that page on Wikipedia in the default browser, and a
+  notice says so. Over SSH, or with `lynx` as the default browser, nothing opens and the notice shows the address.
 
 ### L. Live tab
 
@@ -122,9 +125,10 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 - L3. At 80 columns the right column shows the sparkline, the people/bots split and the top articles of the last 15
   minutes. The editor column appears from about 105 columns and the summary from about 145.
 - L4. Each filter key toggles its filter and the filter line shows its state: `i` wiki (live only; off in a replay), `b` bots, `a` articles only,
-  `m` minimum size. (auto for `a` and `b`)
-- L5. Select a row (arrow keys, then click): `w` adds the article to the Watchlist; Enter opens the edit's detail with
-  a link; `d` opens its diff.
+  `s` minimum size. (auto for `a` and `b`)
+- L5. Select a row (arrow keys, then click, which only moves the cursor): `w` adds the article to the Watchlist; Enter
+  or a double click opens the page on Wikipedia in the browser; `e` opens the edit's details with a link; `d` opens its
+  diff. The same Enter and double click work on a Most edited row, and `e` shows its latest edit.
 - L6. `p` (Hold) pauses the log; it keeps its place while the numbers keep counting. In a replay, space, `+`, `-` and `]`
   pause, speed and skip. (auto for space and `+`)
 
@@ -143,12 +147,15 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 - W2. Add a page by `w`, by `W` and typing a title, and by pasting a Wikipedia URL; a duplicate is not added twice.
 - W3. While the app runs, an edit to a watched page is highlighted in the Live log and the tab badge counts it.
 - W4. Quit, wait, restart: edits made while closed are caught up and a notice says how many pages changed.
-- W5. Each page shows a 30-day sparkline at 120 columns and up; `m` marks seen; `d` or Delete removes a page after a
+- W5. Each page shows a 30-day sparkline at 120 columns and up; `m` marks seen; `x` or Delete removes a page after a
   question, by key and by mouse.
+- W6. Enter or a double click on a page opens it on Wikipedia in the browser and leaves it unseen; `d` opens what
+  changed since you last looked.
 
 ### D. Diff view
 
-- D1. Enter on a watched page with new edits opens the diff; Escape or `b` returns to the tab it came from.
+- D1. `d` on a watched page with new edits opens the diff; Escape returns to the tab it came from (`b` does nothing
+  here). Enter or a double click on the diff opens the change on Wikipedia.
 - D2. Removed text is red with a minus, added text is green with a plus, and the article's address is shown.
 - D3. A very large edit is cut with a notice and a link; a new page explains there is nothing to compare.
 

@@ -7,9 +7,11 @@ from pathlib import Path
 
 import pytest
 import stamina
+from support import FakeBrowser
 
 from wikihose.clock import VirtualClock
 from wikihose.net import Client, RequestBudget
+from wikihose.ui.app import WikihoseApp
 
 # stamina waits for real between tries; turn the waits off but keep three tries, as in production.
 stamina.set_testing(True, attempts=3)
@@ -59,3 +61,12 @@ def sample_path() -> Iterator[Path]:
 
     with sample_recording() as path:
         yield path
+
+
+@pytest.fixture(autouse=True)
+def browser(monkeypatch: pytest.MonkeyPatch) -> FakeBrowser:
+    """No test ever opens a real browser: ``App.open_url`` records the address instead and the browser check says yes."""
+    fake = FakeBrowser()
+    monkeypatch.setattr(WikihoseApp, "open_url", lambda _self, url, **_kwargs: fake.opened.append(url))
+    monkeypatch.setattr("wikihose.ui.browser.can_open_browser", lambda: fake.available)
+    return fake

@@ -59,13 +59,15 @@ Commit subjects are plain imperative sentences, such as "Add the watchlist badge
 
 Versions follow [ZeroVer](https://0ver.org): `0.MINOR.PATCH`, and the major version never becomes 1. `__version__` in
 `src/wikihose/__init__.py` is edited by hand: minor for features, patch for fixes. Release tags are `v0.x.y` and match
-`__version__`. Before tagging, put the release date in place of `Unreleased` in that version's changelog heading
-(`## [0.1.0] - 2026-11-09`) in its own PR; `release.yml` refuses a heading that still says Unreleased. The README
+`__version__`. New changelog entries go under `## [Unreleased]`, the first heading, until the release PR renames it to the new
+version and its date (`## [0.2.0] - 2026-12-01`) and sets `__version__` to match, in its own PR; `release.yml` refuses a
+heading that still says Unreleased. `tests/test_changelog.py` allows that one heading, only as the first. The README
 becomes the PyPI page at the tag, so the same PR drops its "not published yet" wording and makes its image and links
 absolute GitHub URLs, which PyPI can show. Tag only after the by-hand walkthroughs in `docs/uat.md` pass on the exe.
 
 `CHANGELOG.md` follows [Common Changelog](https://common-changelog.org/). Add an entry only for user-visible changes,
-as one imperative line with a `(#PR)` reference under Changed, Added, Removed or Fixed, in that order. Docs, dotfiles,
+as one imperative line with a `(#PR)` reference under Changed, Added, Removed or Fixed, in that order, in the
+`## [Unreleased]` section (create it above the newest version when it is missing). Docs, dotfiles,
 dev-only dependency bumps and style edits get none.
 
 Each entry starts with one [gitmoji](https://gitmoji.dev), the Unicode emoji and not the `:code:`, then a space, then the

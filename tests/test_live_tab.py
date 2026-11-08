@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from support import EASTERN, ListSource, live_tab, make_app, make_edit, settle
+from support import EASTERN, FakeBrowser, ListSource, live_tab, make_app, make_edit, settle
 from textual.widgets import DataTable, Input, Sparkline, Static
 
 from wikihose.clock import VirtualClock
@@ -12,6 +12,7 @@ from wikihose.sources.events import Edit
 from wikihose.store import Store
 from wikihose.ui.dialogs import EditDetail, WikiPrompt
 from wikihose.ui.tabs.live import format_delta, log_columns, size_words
+from wikihose.ui.widgets import PageTable
 
 MIXED = [
     make_edit("Human article", delta=500, user="Alice"),
@@ -135,15 +136,18 @@ async def test_size_key_cycles_through_the_steps(clock: VirtualClock) -> None:
     app = app_with(clock, MIXED)
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
-        await pilot.press("m")
+        await pilot.press("m")  # m belonged to Size once; on the Live tab it does nothing now
+        await pilot.pause()
+        assert "any size" in filters_text(app)
+        await pilot.press("s")
         await pilot.pause()
         assert log_titles(app) == ["Big change", "Human article"]
         assert "100+ bytes" in filters_text(app)
-        await pilot.press("m")
+        await pilot.press("s")
         await pilot.pause()
         assert log_titles(app) == ["Big change"]
         assert "1,000+ bytes" in filters_text(app)
-        await pilot.press("m")
+        await pilot.press("s")
         await pilot.pause()
         assert len(log_titles(app)) == 3
         assert "any size" in filters_text(app)
@@ -241,7 +245,7 @@ async def test_a_filter_change_while_paused_does_not_show_newer_edits(clock: Vir
         tab = await settle(app, pilot)
         await pilot.press("p")
         tab.accept(make_edit("During"))
-        await pilot.press("m")
+        await pilot.press("s")
         await pilot.pause()
         assert log_titles(app) == ["Before"]
 
@@ -408,22 +412,22 @@ async def test_choosing_the_same_wiki_changes_nothing(clock: VirtualClock) -> No
         assert tab.stats.total == 1
 
 
-# --- opening a row ---------------------------------------------------------------------------------------------------
+# --- the details of an edit and opening a row -----------------------------------------------------------------------
 
 
-async def test_enter_on_a_log_row_opens_the_detail_with_the_article_link(clock: VirtualClock) -> None:
-    edit = make_edit("Ada Lovelace (née Byron)", user="Alice", delta=-42, comment="trim", kind="edit")
+async def test_e_on_a_log_row_opens_the_detail_with_the_article_link(clock: VirtualClock) -> None:
+    edit = make_edit("Ada Lovelace (n\u00e9e Byron)", user="Alice", delta=-42, comment="trim", kind="edit")
     app = app_with(clock, [edit])
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
-        await pilot.press("enter")
+        await pilot.press("e")
         await pilot.pause()
         detail = app.screen
         assert isinstance(detail, EditDetail)
         assert detail.url == "https://en.wikipedia.org/wiki/Ada_Lovelace_(n%C3%A9e_Byron)"
         text = " ".join(str(label.render()) for label in detail.query("Label"))
         for part in (
-            "Ada Lovelace (née Byron)",
+            "Ada Lovelace (n\u00e9e Byron)",
             "enwiki",
             "Alice",
             "Sat 07 Nov 2026 14:41:05",
@@ -443,36 +447,111 @@ async def test_the_detail_closes_with_its_button(clock: VirtualClock) -> None:
     app = app_with(clock, [make_edit()])
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
-        await pilot.press("enter")
+        await pilot.press("e")
         await pilot.pause()
         await pilot.click("#close")
         await pilot.pause()
         assert not isinstance(app.screen, EditDetail)
 
 
-async def test_clicking_a_log_row_opens_its_detail(clock: VirtualClock) -> None:
+async def test_clicking_a_log_row_only_moves_the_cursor(clock: VirtualClock, browser: FakeBrowser) -> None:
+    """Even a second single click on the selected row does nothing, so a double click is never a details box first."""
     app = app_with(clock, [make_edit("First"), make_edit("Second")])
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
         await pilot.click("#log", offset=(10, 2))
         await pilot.pause()
+        assert app.query_one("#log", PageTable).cursor_row == 1
         await pilot.click("#log", offset=(10, 2))
         await pilot.pause()
-        assert isinstance(app.screen, EditDetail)
+        assert not isinstance(app.screen, EditDetail)
+        assert browser.opened == []
 
 
-async def test_enter_on_a_top_row_opens_the_detail_of_its_latest_edit(clock: VirtualClock) -> None:
+async def test_e_on_a_top_row_opens_the_detail_of_its_latest_edit(clock: VirtualClock) -> None:
     app = app_with(clock, [make_edit("Hot", user="First"), make_edit("Hot", user="Second", server="en.wikipedia.org")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        app.query_one("#top").focus()
+        await pilot.pause()
+        await pilot.press("e")
+        await pilot.pause()
+        detail = app.screen
+        assert isinstance(detail, EditDetail)
+        assert detail.url == "https://en.wikipedia.org/wiki/Hot"
+        assert "Second" in " ".join(str(label.render()) for label in detail.query("Label"))
+
+
+async def test_enter_on_a_log_row_opens_that_page_in_the_browser(clock: VirtualClock, browser: FakeBrowser) -> None:
+    app = app_with(clock, [make_edit("Ada Lovelace (n\u00e9e Byron)")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == ["https://en.wikipedia.org/wiki/Ada_Lovelace_(n%C3%A9e_Byron)"]
+        assert not isinstance(app.screen, EditDetail)
+        assert any("Opening Ada Lovelace" in n.message for n in app._notifications)
+
+
+async def test_double_click_on_a_log_row_opens_that_page_in_the_browser(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.double_click("#log", offset=(10, 2))
+        await pilot.pause()
+        assert app.query_one("#log", PageTable).cursor_row == 1
+        assert browser.opened == ["https://en.wikipedia.org/wiki/First"]  # newest first: row 1 is the older edit
+        assert not isinstance(app.screen, EditDetail)
+
+
+async def test_enter_and_double_click_on_a_top_row_open_that_page_in_the_browser(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    app = app_with(clock, [make_edit("Hot"), make_edit("Hot")])
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
         app.query_one("#top").focus()
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        detail = app.screen
-        assert isinstance(detail, EditDetail)
-        assert detail.url == "https://en.wikipedia.org/wiki/Hot"
-        assert "Second" in " ".join(str(label.render()) for label in detail.query("Label"))
+        await pilot.double_click("#top", offset=(10, 1))
+        await pilot.pause()
+        assert browser.opened == ["https://en.wikipedia.org/wiki/Hot"] * 2
+
+
+async def test_enter_on_an_empty_log_does_nothing(clock: VirtualClock, browser: FakeBrowser) -> None:
+    app = app_with(clock, [])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == []
+        assert not app._notifications
+
+
+async def test_with_no_browser_the_address_is_shown_instead(clock: VirtualClock, browser: FakeBrowser) -> None:
+    browser.available = False
+    app = app_with(clock, [make_edit("Z\u00fcrich")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == []
+        messages = [n.message for n in app._notifications]
+        address = "https://en.wikipedia.org/wiki/Z%C3%BCrich"
+        assert any("No browser can be opened here" in m and address in m for m in messages)
+
+
+async def test_a_wiki_with_no_web_host_says_so_instead_of_opening(clock: VirtualClock, browser: FakeBrowser) -> None:
+    app = app_with(clock, [make_edit("File:X.png", wiki="commonswiki")], config=Config(wiki="commonswiki"))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == []
+        assert any("There is no web address for File:X.png." in n.message for n in app._notifications)
 
 
 async def test_there_is_no_link_without_an_edit_or_a_trusted_host(clock: VirtualClock) -> None:
@@ -506,3 +585,85 @@ async def test_tab_moves_the_focus_between_the_log_and_the_top_table(clock: Virt
         assert app.focused is app.query_one("#log")
         await pilot.press("tab", "tab", "tab")  # log, top, tab strip, and round to the log again
         assert app.focused is app.query_one("#log")
+
+
+async def test_clicking_enter_open_in_the_live_footer_opens_the_selected_page(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    from test_app_shell import click_footer
+
+    app = app_with(clock, [make_edit("Ada Lovelace")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await click_footer(pilot, app, "Open")
+        assert browser.opened == ["https://en.wikipedia.org/wiki/Ada_Lovelace"]
+
+
+def count_selected_messages(table: PageTable, kind: type) -> list[object]:
+    """Record the messages of this kind that the table posts, while still posting them."""
+    seen: list[object] = []
+    post = table.post_message
+
+    def recording(message: object) -> bool:
+        if isinstance(message, kind):
+            seen.append(message)
+        return post(message)  # type: ignore[arg-type]
+
+    table.post_message = recording  # type: ignore[method-assign]
+    return seen
+
+
+async def test_a_single_click_on_another_row_only_moves_the_cursor(clock: VirtualClock, browser: FakeBrowser) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        table = app.query_one("#log", PageTable)
+        selected = count_selected_messages(table, DataTable.RowSelected)
+        assert table.cursor_row == 0
+        await pilot.click("#log", offset=(10, 2))
+        await pilot.pause()
+        assert table.cursor_row == 1
+        assert selected == []  # DataTable's click handler ran once: it moved the cursor and did not select the row
+        assert browser.opened == []
+
+
+async def test_clicking_the_header_posts_one_message_per_click_and_a_double_click_opens_nothing(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        table = app.query_one("#log", PageTable)
+        headers = count_selected_messages(table, DataTable.HeaderSelected)
+        await pilot.click("#log", offset=(10, 0))
+        await pilot.pause()
+        assert len(headers) == 1
+        await pilot.double_click("#log", offset=(10, 0))
+        await pilot.pause()
+        assert len(headers) == 3
+        assert browser.opened == []
+
+
+async def test_a_double_click_opens_nothing_when_another_row_arrives_under_the_pointer(
+    clock: VirtualClock, browser: FakeBrowser, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second"), make_edit("Third")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        table = app.query_one("#log", PageTable)
+        original = PageTable.on_click
+
+        def after_the_first_click(self: PageTable, event) -> None:
+            if event.chain == 2:  # the live log changed what is under the pointer between the two clicks
+                self.remove_row(self.ordered_rows[1].key)
+            original(self, event)
+
+        monkeypatch.setattr(PageTable, "on_click", after_the_first_click)
+        await pilot.double_click("#log", offset=(10, 2))
+        await pilot.pause()
+        assert len(table.ordered_rows) == 2
+        assert browser.opened == []
+        monkeypatch.setattr(PageTable, "on_click", original)
+        await pilot.double_click("#log", offset=(10, 2))  # with nothing moving, the same gesture opens the page
+        await pilot.pause()
+        assert len(browser.opened) == 1

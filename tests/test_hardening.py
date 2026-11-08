@@ -141,7 +141,7 @@ async def test_a_hostile_server_name_gives_no_link(clock: VirtualClock) -> None:
     app = make_app(ListSource(clock, [edit]), clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
-        await pilot.press("enter")
+        await pilot.press("e")
         await pilot.pause()
         detail = app.screen
         assert isinstance(detail, EditDetail)
@@ -158,7 +158,7 @@ async def test_a_replayed_edit_with_an_escape_code_renders_without_it(clock: Vir
         cells = [str(table.get_cell(row.key, col.key)) for row in table.ordered_rows for col in table.ordered_columns]
         assert any("boom" in cell for cell in cells)
         assert not any("\x1b" in cell for cell in cells)
-        await pilot.press("enter")
+        await pilot.press("e")
         await pilot.pause()
         text = " ".join(str(label.render()) for label in app.screen.query("Label"))
         assert "boom" in text

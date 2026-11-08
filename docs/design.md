@@ -19,7 +19,8 @@ This file is the target. Session 1 starts with a design pass that may change the
    - While the app runs, match live edits against the list with no extra requests, highlight matches and badge the tab.
    - On startup, catch up on edits made while the app was closed.
    - Each page has a 30-day pageview sparkline.
-4. **Diff.** Enter on a tracked edit shows a red/green terminal diff.
+4. **Diff.** `d` on a Live edit, or on a watched page (what changed since you last looked), shows a red/green
+   terminal diff. Escape goes back to the tab it came from.
 5. **Convergence.** Articles hot in both Live and Reading, ranked by edit velocity times spike multiple.
    - Surge trigger: when an article passes an edit-rate threshold (start at 10 human edits in 15 minutes), fetch its
      pageview history automatically.
@@ -48,6 +49,14 @@ that follow one editor across edits.
   ("Stream: reconnecting in 8s", "Pageviews: rate limited, retrying in 12s"), and it clears on recovery. Full feed
   status belongs in a later settings or `--diagnose` view (owner's choice).
 - Floor size: 80x24.
+- One key map across the tabs (owner's request, 8 Nov 2026): Enter, and a double click, on a row that names a page
+  open that page on its wiki in the default browser (Live log and Most edited, Reading, Watchlist, Convergence); on the
+  Diff tab they open the change. A single click only moves the cursor. `d` is Diff (Live: the selected edit, Watchlist:
+  what changed since you last looked), `e` is the details of a Live edit, `s` is the Live size filter, `m` marks a
+  watched page seen and `x` or Delete removes it after a question. Escape leaves the Diff tab. Opening is checked
+  first: over SSH, or with a browser that would run in this terminal (lynx, w3m and the like), nothing is opened and a
+  notice shows the address to copy. In a replay the Live footer leaves out the `enter Open` label, which would not fit
+  80 columns; the key works.
 - Live opens showing articles only with bots hidden. One key toggles each. The people/bots split always counts both
   (owner's choice).
 - At 80 columns the Live log shows time, bytes and article, with a right-hand column holding the edits-per-minute

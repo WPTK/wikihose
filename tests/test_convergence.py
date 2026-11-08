@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 import pytest
 import respx
-from support import ListSource, make_app, make_edit, wait_for_stream
+from support import FakeBrowser, ListSource, make_app, make_edit, wait_for_stream
 from test_reading import NEWEST, history_payload, mock_wiki
 from textual.widgets import Static
 
@@ -404,6 +404,30 @@ async def test_the_table_takes_the_focus_and_w_names_the_page_at_the_cursor(cloc
         table = app.query_one("#convergence-table", PageTable)
         assert app.focused is table
         assert table.page_at_cursor() == ("enwiki", "Busy Page")
+
+
+async def test_enter_and_double_click_on_a_convergence_row_open_that_page_in_the_browser(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    from test_app_shell import click_footer
+
+    fake = FakeReading([spike("Busy_Page", 5.0), spike("Big_Spike", 40.0)])
+    app = convergence_app(clock, fake, edits("Busy Page", 10) + edits("Big Spike", 2))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await open_tab(app, pilot)
+        assert app.focused is app.query_one("#convergence-table", PageTable)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert browser.opened == ["https://en.wikipedia.org/wiki/Big_Spike"]  # 2 edits x 40 outranks 10 x 5
+        await pilot.double_click("#convergence-table", offset=(10, 2))  # the header is row 0
+        await pilot.pause()
+        assert browser.opened[1:] == ["https://en.wikipedia.org/wiki/Busy_Page"]
+        await click_footer(pilot, app, "Open")  # the footer's enter Open does what the key does
+        assert browser.opened[2:] == ["https://en.wikipedia.org/wiki/Busy_Page"]
+        await pilot.press("question_mark")
+        await pilot.pause()
+        keys = [str(line.render()).split()[0] for line in app.screen.query(".help-line")]
+        assert keys == ["enter", "w", "W", "?", "q", "1-5", "Double", "Tab", "Mouse"]
 
 
 async def test_a_new_wiki_starts_the_counts_over(clock: VirtualClock) -> None:

@@ -9,6 +9,7 @@ import pytest
 import respx
 from support import (
     EASTERN,
+    FakeBrowser,
     ListSource,
     action_api,
     finish_work,
@@ -24,13 +25,16 @@ from textual.widgets import Button, DataTable, Input, Label, TabbedContent
 
 from wikihose.clock import VirtualClock
 from wikihose.config import Config, load_config
+from wikihose.diff import DiffHeader
 from wikihose.net import Client
 from wikihose.sources.events import FeedStatus
 from wikihose.sources.recording import sample_recording
 from wikihose.sources.replay import ReplaySource
+from wikihose.store import Store, WatchedPage
 from wikihose.ui.app import TooSmall, WikihoseApp
 from wikihose.ui.bars import HealthBar, TopBar
 from wikihose.ui.dialogs import AddPage, EditDetail, HelpScreen, WikiPrompt
+from wikihose.ui.tabs.diff import DiffRequest, DiffTab
 
 TAB_IDS = ["live", "reading", "watchlist", "diff", "convergence"]
 
@@ -233,7 +237,9 @@ async def test_help_lists_the_active_keys_in_live_mode(clock: VirtualClock) -> N
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press("question_mark")
         await pilot.pause()
-        assert help_keys(app) == ["b", "a", "m", "i", "d", "p", "w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert help_keys(app) == [
+            "enter", "b", "a", "s", "i", "d", "e", "p", "w", "W", "?", "q", "1-5", "Double", "Tab", "Mouse",
+        ]  # fmt: skip
 
 
 async def test_help_lists_the_replay_keys_only_in_a_replay(clock: VirtualClock) -> None:
@@ -243,7 +249,8 @@ async def test_help_lists_the_replay_keys_only_in_a_replay(clock: VirtualClock) 
             await pilot.press("question_mark")
             await pilot.pause()
             assert help_keys(app) == [
-                "b", "a", "m", "d", "p", "w", "W", "?", "q", "space", "+", "-", "]", "1-5", "Enter", "Tab", "Mouse",
+                "enter", "b", "a", "s", "d", "e", "p", "w", "W", "?", "q", "space", "+", "-", "]", "1-5", "Double",
+                "Tab", "Mouse",
             ]  # fmt: skip
 
 
@@ -253,11 +260,11 @@ async def test_help_on_another_tab_does_not_list_the_live_keys(clock: VirtualClo
         await pilot.press("3")
         await pilot.press("question_mark")
         await pilot.pause()
-        assert help_keys(app) == ["w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert help_keys(app) == ["w", "W", "?", "q", "1-5", "Double", "Tab", "Mouse"]
 
 
 async def test_an_empty_watchlist_tab_takes_no_focus(clock: VirtualClock) -> None:
-    """Its table is hidden, so the focus stays off it and the tab's m, d and Delete keys do not reach the help screen."""
+    """Its table is hidden, so the focus stays off it and the tab's m, d, x and Delete keys do not reach the help screen."""
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press("3")
@@ -572,7 +579,7 @@ async def test_filter_changes_are_saved_to_the_config_file(clock: VirtualClock, 
     path = tmp_path / "config" / "config.toml"
     app = app_with(clock, config_path=path)
     async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.press("b", "a", "m")
+        await pilot.press("b", "a", "s")
         await pilot.pause()
     saved, warnings = load_config(path)
     assert warnings == []
@@ -582,7 +589,7 @@ async def test_filter_changes_are_saved_to_the_config_file(clock: VirtualClock, 
 async def test_no_config_never_writes_the_config_file(clock: VirtualClock, tmp_path: Path) -> None:
     app = app_with(clock, config_path=None)
     async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.press("b", "a", "m")
+        await pilot.press("b", "a", "s")
         await pilot.pause()
     assert app.config.hide_bots is False  # the change holds for this run
     assert not (tmp_path / "config").exists()
@@ -629,7 +636,7 @@ async def test_edit_detail_is_not_a_help_screen_and_closes_with_escape(clock: Vi
     app = app_with(clock, make_edit())
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
-        await pilot.press("enter")
+        await pilot.press("e")
         await pilot.pause()
         assert isinstance(app.screen, EditDetail)
         await pilot.press("escape")
@@ -702,6 +709,32 @@ async def test_the_footer_fits_80_columns_on_every_tab(clock: VirtualClock, mode
                 assert max(k.region.right for k in keys) <= 80, footer_text(keys)
 
 
+@pytest.mark.parametrize("mode", ["demo", "replay", "stream"])
+async def test_the_footer_fits_80_columns_with_rows_on_every_tab(clock: VirtualClock, mode: str) -> None:
+    """With rows in the tables the focus is on a table, so its Open label counts toward the 80 columns."""
+    page = WatchedPage("enwiki", 1, "Ada Lovelace", clock.now(), 2, 20, 10, clock.now(), False)
+    request = DiffRequest("enwiki", 10, 20, DiffHeader("Ada Lovelace", "Alice", "", clock.now(), 1, 2, None))
+    store = Store(":memory:")
+    with sample_recording() as path:
+        if mode == "stream":
+            store.add_watch(page.wiki, page.page_id, page.title, page.added_at, page.seen_rev_id)
+            store.set_watch_state(
+                page.wiki, page.page_id, unseen=2, last_rev_id=20, last_edit_at=page.last_edit_at, deleted=False
+            )
+            app = make_app(ListSource(clock, [make_edit(f"Page {n}") for n in range(3)]), clock, store=store)
+        else:
+            source = ReplaySource(path, clock)
+            app = make_app(source, clock, loop_replay=mode == "demo", saved_watchlist=[page])
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            app.query_one(DiffTab).show(request)
+            for key in "12345":
+                await pilot.press(key)
+                keys = await footer_keys(pilot, app)
+                assert max(k.region.right for k in keys) <= 80, f"{mode} tab {key}: {footer_text(keys)}"
+    store.close()
+
+
 async def test_i_does_nothing_in_a_replay(clock: VirtualClock) -> None:
     with sample_recording() as path:
         app = make_app(ReplaySource(path, clock), clock)
@@ -735,3 +768,33 @@ async def test_clicking_each_replay_footer_key_does_what_its_key_does(clock: Vir
                 case "Skip":
                     assert (source.moment() - before).total_seconds() == 60
             await wait_for_stream(app, pilot) if not source.paused else None
+
+
+async def test_in_a_replay_the_live_footer_leaves_out_enter_open_but_enter_still_opens(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    """The Live footer in a replay has no room for the label (79 of 80 columns without it); the key still works."""
+    with sample_recording() as path:
+        app = make_app(ReplaySource(path, clock), clock)
+        async with app.run_test(size=(80, 24)) as pilot:
+            await settle(app, pilot)
+            assert "Open" not in footer_text(await footer_keys(pilot, app, needing="Quit"))
+            await pilot.press("enter")
+            await pilot.pause()
+            assert len(browser.opened) == 1
+            assert browser.opened[0].startswith("https://en.wikipedia.org/wiki/")
+            await pilot.press("question_mark")
+            await pilot.pause()
+            assert "enter" in help_keys(app)  # help still lists it
+
+
+async def test_help_says_what_enter_and_double_click_do(clock: VirtualClock) -> None:
+    app = app_with(clock, make_edit())
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("question_mark")
+        await pilot.pause()
+        lines = [str(line.render()) for line in app.screen.query(".help-line")]
+        assert "  enter         Open the selected page on Wikipedia" in lines
+        assert "  Double click  Open a page on Wikipedia, like Enter" in lines
+        assert "  e             Show the details of the selected edit" in lines

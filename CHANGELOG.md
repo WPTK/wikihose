@@ -3,6 +3,25 @@
 This file follows [Common Changelog](https://common-changelog.org/), with a [gitmoji](https://gitmoji.dev) prefix on each
 entry. Versions follow [ZeroVer](https://0ver.org).
 
+## [Unreleased]
+
+### Changed
+
+- 💥 Move the Live size filter from `m` to `s`, so `m` means Seen only on the Watchlist (#38)
+- 💥 Move the Live edit details from Enter to `e`, because Enter now opens the page (#38)
+- 💥 Move Watchlist Remove from `d` to `x` (Delete still works), so `d` is Diff on every tab (#38)
+- 🚸 Move the Watchlist diff from Enter to `d`, because Enter now opens the page (#38)
+
+### Added
+
+- ✨ Open the selected page on Wikipedia with Enter or a double click, on the Live log and Most edited, Reading, Watchlist and Convergence, with an `enter Open` footer label where it fits (#38)
+- ✨ Open the change on Wikipedia with Enter or a double click on the Diff tab (#38)
+- ✨ Show the page's address in a notice when no browser can be opened, over SSH or with a text browser (#38)
+
+### Removed
+
+- 🔥 Remove the `b` alias for going back from the Diff tab; Escape goes back (#38)
+
 ## [0.1.0] - 2026-11-08
 
 _Known issue: the Live log can show rows slightly out of time order, as the feed sends them (#27)._
