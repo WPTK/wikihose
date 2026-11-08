@@ -342,7 +342,7 @@ async def test_a_wiki_change_during_a_surge_fetch_drops_its_answer(clock: Virtua
         assert not tab.model.pending
 
 
-async def test_quitting_during_a_surge_fetch_is_clean(clock: VirtualClock) -> None:
+async def test_quitting_during_a_surge_fetch_exits_without_an_error(clock: VirtualClock) -> None:
     fake = FakeReading([], {"Hot": spike("Hot", 4.0)})
     fake.hold = asyncio.Event()
     app = convergence_app(clock, fake, edits("Hot", SURGE_EDITS))
@@ -425,3 +425,13 @@ async def test_the_columns_fit_without_scrolling_sideways(clock: VirtualClock, w
         assert table.row_count == 1
         assert table.virtual_size.width <= table.scrollable_content_region.width
         assert table.max_scroll_x == 0
+
+
+async def test_a_failed_reload_keeps_the_earlier_ranking(clock: VirtualClock) -> None:
+    fake = FakeReading([spike("Unedited", 9.0)])
+    app = convergence_app(clock, fake, [])
+    async with app.run_test(size=(80, 24)) as pilot:
+        tab = await open_tab(app, pilot)
+        tab.set_reading("enwiki", [], "Pageviews: could not reach Wikimedia. Press r to try again.")
+        await pilot.pause()
+        assert "Nothing is hot in both" in text_of(app, "convergence-empty")

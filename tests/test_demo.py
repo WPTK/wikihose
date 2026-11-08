@@ -292,7 +292,7 @@ def test_the_capture_script_refuses_when_no_color_is_set(
     script = load_capture_script()
     monkeypatch.setenv("NO_COLOR", "1")
     monkeypatch.setattr(script, "OUTPUT", Path("never-written.svg"))
-    assert script.main() == 1
+    assert script.main([]) == 1
     assert "NO_COLOR" in capsys.readouterr().err
     assert not Path("never-written.svg").exists()
 
