@@ -98,14 +98,15 @@ async def test_clicking_the_live_tab_puts_the_focus_in_it(clock: VirtualClock) -
         assert app.focused.id == "log"
 
 
-@pytest.mark.parametrize("tab", ["convergence"])
-async def test_stub_panes_say_what_is_coming(clock: VirtualClock, tab: str) -> None:
+async def test_every_tab_is_built(clock: VirtualClock) -> None:
+    """No tab is a placeholder any more: clicking Convergence opens the real tab."""
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.click(f"Tab#--content-tab-{tab}")
+        await pilot.click("Tab#--content-tab-convergence")
         await pilot.pause()
-        text = str(app.query_one(f"TabPane#{tab} StubPane").render())
-        assert "Arrives in a later version." in text
+        heading = str(app.query_one("TabPane#convergence #convergence-heading").render())
+        assert heading.startswith("Live edits vs. the last full day of reading")
+        assert not app.query("StubPane")
 
 
 # --- the top bar -----------------------------------------------------------------------------------------------------

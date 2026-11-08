@@ -66,6 +66,8 @@ src/wikihose/
   cli.py        argument parsing (build_parser) and the entry point: --wiki, --replay, --demo, --record, --headless-seconds
   headless.py   run_headless: feeds LiveStats from a source with no screen
   live_stats.py edits per minute, the 60-bucket series, the most edited, the people/bots split
+  convergence.py the Convergence numbers: edits by people per article in 15 minutes, joined with Reading, and the
+                surge trigger's queue (its constants are the product choices: window, surge size, minimum spike)
   selftest.py   the checks behind --selftest
   clock.py      the injectable Clock: SystemClock, VirtualClock (the only place that sleeps)
   paths.py      config, data, log and cache directories, with env overrides
@@ -78,6 +80,8 @@ src/wikihose/
   watchlist_input.py  reading what the user types after w: a title or a pasted article URL
   watchlist.py  the Watchlist service: add by page ID, in-memory match by (wiki, title), moves, unseen counts, and
                 subscribe/in/len for the tabs that redraw when it changes
+  reading.py    the Reading data: the daily spike ranking, 30-day history, summaries, and spike_of (one page's spike,
+                for the Convergence surge trigger)
   trend.py      the Watchlist tab's 30-day pageview trend: fetched through ReadingData.history, cached in the pageviews table
   catchup.py    startup catch-up of the watched pages through the Action API
   diff.py       the REST compare payload as data, and render_diff for a Rich Text
@@ -95,8 +99,8 @@ src/wikihose/
     dialogs.py    help, add a page, stop watching a page, change wiki, edit detail
     widgets.py    PageTable (a table that can say which page the cursor is on) and spark, the sparkline text
     theme.py      the themes
-    tabs/         live.py (Live), watchlist.py (Watchlist), diff.py (Diff and the OpenDiff message that asks for
-                  one) and stub.py (Reading and Convergence, until they are built)
+    tabs/         live.py (Live), reading.py (Reading), watchlist.py (Watchlist), diff.py (Diff and the OpenDiff
+                  message that asks for one) and convergence.py (Convergence)
 ```
 
 ## Tests
