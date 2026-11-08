@@ -17,6 +17,7 @@ venv/
 # Build output
 build/
 dist/
+.pyi-build/
 *.spec
 
 # Local assistant files
