@@ -218,6 +218,15 @@ class WikihoseApp(App[None]):
 
     # --- screens and data flow ---------------------------------------------------------------------------------------
 
+    def _on_main(self, method: Callable[..., None], *args: Any) -> None:
+        """Run a MainScreen method on the screen's own message loop.
+
+        The stream and catch-up workers and the app's own handlers run outside that loop. Calling the screen's methods
+        from them can query widgets Textual has already removed while it shuts down (``NoMatches``). ``post_message``
+        returns False once the screen is closing, so a callback queued here only runs while its widgets still exist.
+        """
+        self._main.call_later(method, *args)
+
     def get_default_screen(self) -> Screen[Any]:
         return self._main
 
@@ -241,9 +250,9 @@ class WikihoseApp(App[None]):
         if isinstance(item, FeedStatus):
             if isinstance(self.source, ReplaySource) and item.state == "down" and item.detail == REPLAY_FINISHED:
                 self.replay_finished = True  # the end of a recording is not a failure
-                self._main.refresh_top_bar()
+                self._on_main(self._main.refresh_top_bar)
             else:
-                self._main.handle_status(item)
+                self._on_main(self._main.handle_status, item)
             return
         if isinstance(item, Edit):
             self._watch_edit(item)
@@ -274,7 +283,7 @@ class WikihoseApp(App[None]):
         self.show_unseen()
 
     def show_unseen(self) -> None:
-        self._main.set_badge(self.watchlist.unseen_total())
+        self._on_main(self._main.set_badge, self.watchlist.unseen_total())
 
     # --- live matching: memory only, never a request -----------------------------------------------------------------
 
@@ -302,20 +311,20 @@ class WikihoseApp(App[None]):
     async def _catch_up(self, client: Client) -> None:
         total = len(self.watchlist)
         what = f"{total} watched page" + ("" if total == 1 else "s")
-        self._main.set_note(f"Checking {what}…")
+        self._on_main(self._main.set_note, f"Checking {what}…")
         try:
             result = await catch_up(
                 self.watchlist,
                 client,
                 self.clock,
-                lambda done, of: self._main.set_note(f"Checking {what}… {done} of {of}"),
+                lambda done, of: self._on_main(self._main.set_note, f"Checking {what}… {done} of {of}"),
             )
         except Exception:  # a bug here must cost the catch-up, not the app
             log.exception("the startup catch-up failed")
             self.notify("Could not check your watched pages.", severity="warning", timeout=6, markup=False)
             return
         finally:
-            self._main.set_note("")
+            self._on_main(self._main.set_note, "")
         self._report_catch_up(what, result)
 
     def _report_catch_up(self, what: str, result: CatchUpResult) -> None:
@@ -425,22 +434,22 @@ class WikihoseApp(App[None]):
                 replay.resume()
             else:
                 replay.pause()
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     def action_replay_faster(self) -> None:
         if (replay := self._replay()) is not None:
             replay.speed = replay.speed * 2
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     def action_replay_slower(self) -> None:
         if (replay := self._replay()) is not None:
             replay.speed = replay.speed / 2
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     def action_replay_skip(self) -> None:
         if (replay := self._replay()) is not None:
             replay.skip(60)
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     # --- messages from the tabs --------------------------------------------------------------------------------------
 
@@ -451,7 +460,7 @@ class WikihoseApp(App[None]):
 
     def on_live_tab_wiki_changed(self, message: LiveTab.WikiChanged) -> None:
         self.wiki = message.wiki
-        self._main.set_wiki(message.wiki)
+        self._on_main(self._main.set_wiki, message.wiki)
         self.update_config(wiki=message.wiki)
 
     def update_config(self, **changes: Any) -> None:
