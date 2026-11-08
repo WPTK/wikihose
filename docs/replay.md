@@ -38,8 +38,8 @@ deliberately broken). It ships in the wheel and is used by the tests and by `--s
 loses at most a second. With a `wiki` it keeps only events whose JSON `wiki` field matches. The live source hands it
 every raw event before parsing, so a recording holds events the app does not use, such as `categorize`, too.
 
-The `--record FILE` flag arrives with the Live tab in the next pull request; it opens a `Recorder` and gives it to the
-live source.
+`--record FILE` opens a `Recorder` and gives it to the live source. It refuses an existing file unless `--force` is
+also given, and cannot be combined with `--replay`. `--wiki NAME` picks the wiki to record.
 
 ## Replaying
 
@@ -55,4 +55,11 @@ Controls, for the key bindings to call:
   counts and aggregates stay right.
 - `moment()` is the recorded time reached so far, for the clock the screen shows.
 
-`--replay FILE` and its keys (pause, speed up, slow down, skip) arrive with the Live tab in the next pull request.
+`--replay FILE` runs the app on a recording. `--speed N` sets the starting speed. The top bar says "Recorded data, not
+live" with the state (paused, a speed, or replay finished). Keys, shown only in a replay:
+
+- `space` pauses and resumes
+- `+` and `-` double and halve the speed (0.5x to 16x)
+- `]` skips ahead 60 seconds
+
+`--headless-seconds N` plays the recording with no screen and prints a one-line summary.
