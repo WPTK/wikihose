@@ -57,12 +57,36 @@ Commit subjects are plain imperative sentences, such as "Add the watchlist badge
 
 ## Versions and the changelog
 
-Versions follow ZeroVer: `0.MINOR.PATCH`, with the major staying 0. `__version__` in `src/wikihose/__init__.py` is edited
-by hand: minor for features, patch for fixes. Release tags are `v0.x.y` and match `__version__`.
+Versions follow [ZeroVer](https://0ver.org): `0.MINOR.PATCH`, and the major version never becomes 1. `__version__` in
+`src/wikihose/__init__.py` is edited by hand: minor for features, patch for fixes. Release tags are `v0.x.y` and match
+`__version__`.
 
 `CHANGELOG.md` follows [Common Changelog](https://common-changelog.org/). Add an entry only for user-visible changes,
 as one imperative line with a `(#PR)` reference under Changed, Added, Removed or Fixed, in that order. Docs, dotfiles,
 dev-only dependency bumps and style edits get none.
+
+Each entry starts with one [gitmoji](https://gitmoji.dev), the Unicode emoji and not the `:code:`, then a space, then the
+line: `- ✨ Add the Live tab: ... (#8)`. Pick the emoji that fits the line, whatever section it sits in. Only these are
+allowed, and `tests/test_changelog.py` checks the changelog and this table against one list:
+
+| Emoji | Use for |
+| --- | --- |
+| ✨ | New feature |
+| 🐛 | Bug fix |
+| ⚡️ | Performance |
+| 🔒️ | Security |
+| 💄 | UI or style |
+| ♿️ | Accessibility |
+| 🚑️ | Critical hotfix |
+| 💥 | Breaking change |
+| 🔥 | Removal |
+| 🗑️ | Deprecation |
+| 🌐 | Localization |
+| 🚸 | Usability |
+| 📦️ | Packaging or install change users can see |
+| ⬆️ | User-visible dependency upgrade |
+
+Gitmoji is for the changelog and release notes only. Commit subjects stay plain imperative sentences with no emoji.
 
 ## Vendored code
 
