@@ -1,0 +1,422 @@
+{
+ "from": {
+  "id": 1336975339,
+  "slot_role": "main",
+  "sections": [
+   {
+    "level": 2,
+    "heading": "==Biography==",
+    "offset": 6527
+   },
+   {
+    "level": 3,
+    "heading": "===Childhood===",
+    "offset": 6541
+   },
+   {
+    "level": 3,
+    "heading": "===Adult years===",
+    "offset": 11486
+   },
+   {
+    "level": 3,
+    "heading": "===Education===",
+    "offset": 18057
+   },
+   {
+    "level": 3,
+    "heading": "===Death===",
+    "offset": 20630
+   },
+   {
+    "level": 2,
+    "heading": "==Work==",
+    "offset": 22584
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's lecture, Menabrea's French transcription, Lovelace's translation and Notes A-G===",
+    "offset": 26180
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's preface===",
+    "offset": 28257
+   },
+   {
+    "level": 3,
+    "heading": "===First published computer program===",
+    "offset": 29501
+   },
+   {
+    "level": 4,
+    "heading": "====Controversy over contribution====",
+    "offset": 31967
+   },
+   {
+    "level": 3,
+    "heading": "===Insight into potential of computing devices===",
+    "offset": 38986
+   },
+   {
+    "level": 3,
+    "heading": "===Distinction between mechanism and logical structure===",
+    "offset": 44668
+   },
+   {
+    "level": 2,
+    "heading": "==Commemoration<!--'Ada Lovelace Day' redirects here-->==",
+    "offset": 46535
+   },
+   {
+    "level": 3,
+    "heading": "===Bicentenary (2015)===",
+    "offset": 63038
+   },
+   {
+    "level": 2,
+    "heading": "==In popular culture==",
+    "offset": 66764
+   },
+   {
+    "level": 3,
+    "heading": "===Novels and plays===",
+    "offset": 67030
+   },
+   {
+    "level": 3,
+    "heading": "===Film and television===",
+    "offset": 71572
+   },
+   {
+    "level": 3,
+    "heading": "===Games===",
+    "offset": 74783
+   },
+   {
+    "level": 3,
+    "heading": "===Computing and STEM===",
+    "offset": 75823
+   },
+   {
+    "level": 3,
+    "heading": "===Other===",
+    "offset": 81573
+   },
+   {
+    "level": 2,
+    "heading": "==Publications==",
+    "offset": 84381
+   },
+   {
+    "level": 3,
+    "heading": "===Publication history===",
+    "offset": 85472
+   },
+   {
+    "level": 2,
+    "heading": "==See also==",
+    "offset": 87180
+   },
+   {
+    "level": 2,
+    "heading": "==Explanatory notes==",
+    "offset": 87435
+   },
+   {
+    "level": 2,
+    "heading": "==References==",
+    "offset": 87471
+   },
+   {
+    "level": 3,
+    "heading": "===Citations===",
+    "offset": 87486
+   },
+   {
+    "level": 3,
+    "heading": "===General and cited sources===",
+    "offset": 87515
+   },
+   {
+    "level": 2,
+    "heading": "==Further reading==",
+    "offset": 92597
+   },
+   {
+    "level": 2,
+    "heading": "==External links==",
+    "offset": 93163
+   }
+  ]
+ },
+ "to": {
+  "id": 1337855710,
+  "slot_role": "main",
+  "sections": [
+   {
+    "level": 2,
+    "heading": "==Biography==",
+    "offset": 6527
+   },
+   {
+    "level": 3,
+    "heading": "===Childhood===",
+    "offset": 6541
+   },
+   {
+    "level": 3,
+    "heading": "===Adult years===",
+    "offset": 11486
+   },
+   {
+    "level": 3,
+    "heading": "===Education===",
+    "offset": 18057
+   },
+   {
+    "level": 3,
+    "heading": "===Death===",
+    "offset": 20630
+   },
+   {
+    "level": 2,
+    "heading": "==Work==",
+    "offset": 22584
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's lecture, Menabrea's French transcription, Lovelace's translation and Notes A-G===",
+    "offset": 26180
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's preface===",
+    "offset": 28257
+   },
+   {
+    "level": 3,
+    "heading": "===First published computer program===",
+    "offset": 29501
+   },
+   {
+    "level": 4,
+    "heading": "====Controversy over contribution====",
+    "offset": 31967
+   },
+   {
+    "level": 3,
+    "heading": "===Insight into potential of computing devices===",
+    "offset": 38986
+   },
+   {
+    "level": 3,
+    "heading": "===Distinction between mechanism and logical structure===",
+    "offset": 44668
+   },
+   {
+    "level": 2,
+    "heading": "==Commemoration<!--'Ada Lovelace Day' redirects here-->==",
+    "offset": 46535
+   },
+   {
+    "level": 3,
+    "heading": "===Bicentenary (2015)===",
+    "offset": 63038
+   },
+   {
+    "level": 2,
+    "heading": "==In popular culture==",
+    "offset": 66764
+   },
+   {
+    "level": 3,
+    "heading": "===Novels, plays and poetry===",
+    "offset": 67030
+   },
+   {
+    "level": 3,
+    "heading": "===Film and television===",
+    "offset": 71943
+   },
+   {
+    "level": 3,
+    "heading": "===Games===",
+    "offset": 75154
+   },
+   {
+    "level": 3,
+    "heading": "===Computing and STEM===",
+    "offset": 76194
+   },
+   {
+    "level": 3,
+    "heading": "===Other===",
+    "offset": 81944
+   },
+   {
+    "level": 2,
+    "heading": "==Publications==",
+    "offset": 84752
+   },
+   {
+    "level": 3,
+    "heading": "===Publication history===",
+    "offset": 85843
+   },
+   {
+    "level": 2,
+    "heading": "==See also==",
+    "offset": 87551
+   },
+   {
+    "level": 2,
+    "heading": "==Explanatory notes==",
+    "offset": 87806
+   },
+   {
+    "level": 2,
+    "heading": "==References==",
+    "offset": 87842
+   },
+   {
+    "level": 3,
+    "heading": "===Citations===",
+    "offset": 87857
+   },
+   {
+    "level": 3,
+    "heading": "===General and cited sources===",
+    "offset": 87886
+   },
+   {
+    "level": 2,
+    "heading": "==Further reading==",
+    "offset": 92968
+   },
+   {
+    "level": 2,
+    "heading": "==External links==",
+    "offset": 93534
+   }
+  ]
+ },
+ "diff": [
+  {
+   "type": 0,
+   "lineNumber": 201,
+   "text": "[[File:Ada Lovelace color.svg|thumb|upright|An illustration inspired by the [[A. E. Chalon]] portrait created for the [[Ada Initiative]], which supported open technology and women|alt=Illustration of Ada Lovelace's portrait in a gold frame]]",
+   "offset": {
+    "from": 66787,
+    "to": 66787
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 202,
+   "text": "",
+   "offset": {
+    "from": 67029,
+    "to": 67029
+   }
+  },
+  {
+   "type": 3,
+   "lineNumber": 203,
+   "text": "===Novels, plays and playspoetry===",
+   "offset": {
+    "from": 67030,
+    "to": 67030
+   },
+   "highlightRanges": [
+    {
+     "start": 9,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 21,
+     "length": 5,
+     "type": 1
+    },
+    {
+     "start": 26,
+     "length": 6,
+     "type": 0
+    }
+   ]
+  },
+  {
+   "type": 0,
+   "lineNumber": 204,
+   "text": "Lovelace is portrayed in [[Romulus Linney (playwright)|Romulus Linney]]'s 1977 play ''[[Childe Byron]]''.<ref>{{cite web |last=Klein |first=Alvin |author-link=Alvin Klein |date=13 May 1984 |title=Theatre in review: A lusty Byron in Rockland |url=https://www.nytimes.com/1984/05/13/nyregion/theater-in-review-a-lusty-byron-in-rockland.html |url-access=limited |id={{ProQuest|425075032}} |newspaper=[[The New York Times]]}}</ref> In [[Tom Stoppard]]'s 1993 play ''[[Arcadia (play)|Arcadia]]'', the precocious teenage genius Thomasina Coverly—a character \"apparently based\" on Ada Lovelace (the play also involves [[Lord Byron]])—comes to understand [[chaos theory]], and theorises the [[second law of thermodynamics]], before either is officially recognised.<ref name=\"newyorker13\">{{cite magazine|url=https://www.newyorker.com/books/page-turner/tom-stoppards-arcadia-at-twenty |title=Tom Stoppard's 'Arcadia,' at Twenty |first=Brad |last=Leithauser |date=8 August 2013 |magazine=[[The New Yorker]]}}</ref><ref>[http://www.tomw.net.au/arcadia.txt Profile], Gale Edwards, 1994, Director of \"Arcadia\" for the Sydney Theatre Company</ref>",
+   "offset": {
+    "from": 67053,
+    "to": 67061
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 205,
+   "text": "",
+   "offset": {
+    "from": 68191,
+    "to": 68199
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 209,
+   "text": "",
+   "offset": {
+    "from": 70015,
+    "to": 70023
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 210,
+   "text": "The 2015 play ''Ada and the Engine'' by [[Lauren Gunderson]] portrays Lovelace and Charles Babbage in unrequited love, and it imagines a post-death meeting between Lovelace and her father.<ref name=\"kqed\">{{cite web |url=http://ww2.kqed.org/arts/the-do-list/ada-and-the-memory-engine/ |title=Ada and the Memory Engine |first= Sam |last=Hurwitt |publisher=KQED |archive-date=6 September 2015 |archive-url=https://web.archive.org/web/20150906141059/https://ww2.kqed.org/arts/the-do-list/ada-and-the-memory-engine/ |url-status=dead}}</ref><ref name=\"sfweekly\">{{cite web |url=http://www.sfweekly.com/exhibitionist/2015/10/22/ada-and-the-memory-engine-love-by-the-numbers |title=Ada and the Memory Engine: Love by the Numbers |work=[[SF Weekly]] |date=22 October 2015 |access-date=14 November 2015 |author=Costello, Elizabeth |archive-date=6 April 2016 |archive-url=https://web.archive.org/web/20160406052014/http://www.sfweekly.com/exhibitionist/2015/10/22/ada-and-the-memory-engine-love-by-the-numbers |url-status=dead }}</ref> Lovelace and Babbage are also the main characters in [[Sydney Padua]]'s webcomic and graphic novel ''[[The Thrilling Adventures of Lovelace and Babbage]]''. The comic features extensive footnotes on the history of Ada Lovelace, and many lines of dialogue are drawn from actual correspondence.<ref>{{cite web |last=Doctorow |first=Cory |title=Comic about Ada Lovelace and Charles Babbage |url=http://boingboing.net/2009/10/05/comic-about-ada-love.html |website=BoingBoing |access-date=10 October 2014 |date=5 October 2009}}</ref>",
+   "offset": {
+    "from": 70016,
+    "to": 70024
+   }
+  },
+  {
+   "type": 1,
+   "lineNumber": 211,
+   "text": "",
+   "offset": {
+    "from": null,
+    "to": 71579
+   }
+  },
+  {
+   "type": 1,
+   "lineNumber": 212,
+   "text": "Poet Jessy Randall included a tribute to Lovelace in her 2025 collection of poems about women scientists, ''The Path of Most Resistance''.<ref>{{cite web |title=''The Path of Most Resistance: Poems on Women in Science'', by Jessy Randall |website=MIT Press |url=https://mitpress.mit.edu/9781915983275/the-path-of-most-resistance/ |access-date=2026-02-11}}</ref>",
+   "offset": {
+    "from": null,
+    "to": 71580
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 213,
+   "text": "",
+   "offset": {
+    "from": 71571,
+    "to": 71942
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 214,
+   "text": "===Film and television===",
+   "offset": {
+    "from": 71572,
+    "to": 71943
+   }
+  }
+ ]
+}

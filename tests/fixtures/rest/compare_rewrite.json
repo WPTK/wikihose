@@ -1,0 +1,1178 @@
+{
+ "from": {
+  "id": 1330237185,
+  "slot_role": "main",
+  "sections": [
+   {
+    "level": 2,
+    "heading": "==Biography==",
+    "offset": 7220
+   },
+   {
+    "level": 3,
+    "heading": "===Childhood===",
+    "offset": 7234
+   },
+   {
+    "level": 3,
+    "heading": "===Adult years===",
+    "offset": 12179
+   },
+   {
+    "level": 3,
+    "heading": "===Education===",
+    "offset": 18750
+   },
+   {
+    "level": 3,
+    "heading": "===Death===",
+    "offset": 21323
+   },
+   {
+    "level": 2,
+    "heading": "==Work==",
+    "offset": 23277
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's lecture, Menabrea's French transcription, Lovelace's translation and Notes A-G===",
+    "offset": 26873
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's preface===",
+    "offset": 28921
+   },
+   {
+    "level": 3,
+    "heading": "===First published computer program===",
+    "offset": 30165
+   },
+   {
+    "level": 4,
+    "heading": "====Controversy over contribution====",
+    "offset": 32631
+   },
+   {
+    "level": 3,
+    "heading": "===Insight into potential of computing devices===",
+    "offset": 39555
+   },
+   {
+    "level": 3,
+    "heading": "===Distinction between mechanism and logical structure===",
+    "offset": 45237
+   },
+   {
+    "level": 2,
+    "heading": "==Commemoration<!--'Ada Lovelace Day' redirects here-->==",
+    "offset": 47104
+   },
+   {
+    "level": 3,
+    "heading": "===Bicentenary (2015)===",
+    "offset": 62047
+   },
+   {
+    "level": 2,
+    "heading": "==In popular culture==",
+    "offset": 65789
+   },
+   {
+    "level": 3,
+    "heading": "===Novels and plays===",
+    "offset": 66055
+   },
+   {
+    "level": 3,
+    "heading": "===Film and television===",
+    "offset": 70597
+   },
+   {
+    "level": 3,
+    "heading": "===Games===",
+    "offset": 73808
+   },
+   {
+    "level": 3,
+    "heading": "===Computing and STEM===",
+    "offset": 74712
+   },
+   {
+    "level": 3,
+    "heading": "===Other===",
+    "offset": 80462
+   },
+   {
+    "level": 2,
+    "heading": "==Publications==",
+    "offset": 83270
+   },
+   {
+    "level": 3,
+    "heading": "===Publication history===",
+    "offset": 84361
+   },
+   {
+    "level": 2,
+    "heading": "==See also==",
+    "offset": 86069
+   },
+   {
+    "level": 2,
+    "heading": "==Explanatory notes==",
+    "offset": 86324
+   },
+   {
+    "level": 2,
+    "heading": "==References==",
+    "offset": 86360
+   },
+   {
+    "level": 3,
+    "heading": "===Citations===",
+    "offset": 86375
+   },
+   {
+    "level": 3,
+    "heading": "===General and cited sources===",
+    "offset": 86404
+   },
+   {
+    "level": 2,
+    "heading": "==Further reading==",
+    "offset": 91486
+   },
+   {
+    "level": 2,
+    "heading": "==External links==",
+    "offset": 92052
+   }
+  ]
+ },
+ "to": {
+  "id": 1330237300,
+  "slot_role": "main",
+  "sections": [
+   {
+    "level": 2,
+    "heading": "==Biography==",
+    "offset": 6531
+   },
+   {
+    "level": 3,
+    "heading": "===Childhood===",
+    "offset": 6545
+   },
+   {
+    "level": 3,
+    "heading": "===Adult years===",
+    "offset": 11490
+   },
+   {
+    "level": 3,
+    "heading": "===Education===",
+    "offset": 18061
+   },
+   {
+    "level": 3,
+    "heading": "===Death===",
+    "offset": 20634
+   },
+   {
+    "level": 2,
+    "heading": "==Work==",
+    "offset": 22588
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's lecture, Menabrea's French transcription, Lovelace's translation and Notes A-G===",
+    "offset": 26184
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's preface===",
+    "offset": 28232
+   },
+   {
+    "level": 3,
+    "heading": "===First published computer program===",
+    "offset": 29476
+   },
+   {
+    "level": 4,
+    "heading": "====Controversy over contribution====",
+    "offset": 31942
+   },
+   {
+    "level": 3,
+    "heading": "===Insight into potential of computing devices===",
+    "offset": 38866
+   },
+   {
+    "level": 3,
+    "heading": "===Distinction between mechanism and logical structure===",
+    "offset": 44548
+   },
+   {
+    "level": 2,
+    "heading": "==Commemoration<!--'Ada Lovelace Day' redirects here-->==",
+    "offset": 46415
+   },
+   {
+    "level": 3,
+    "heading": "===Bicentenary (2015)===",
+    "offset": 61358
+   },
+   {
+    "level": 2,
+    "heading": "==In popular culture==",
+    "offset": 65100
+   },
+   {
+    "level": 3,
+    "heading": "===Novels and plays===",
+    "offset": 65366
+   },
+   {
+    "level": 3,
+    "heading": "===Film and television===",
+    "offset": 69908
+   },
+   {
+    "level": 3,
+    "heading": "===Games===",
+    "offset": 73119
+   },
+   {
+    "level": 3,
+    "heading": "===Computing and STEM===",
+    "offset": 74023
+   },
+   {
+    "level": 3,
+    "heading": "===Other===",
+    "offset": 79773
+   },
+   {
+    "level": 2,
+    "heading": "==Publications==",
+    "offset": 82581
+   },
+   {
+    "level": 3,
+    "heading": "===Publication history===",
+    "offset": 83672
+   },
+   {
+    "level": 2,
+    "heading": "==See also==",
+    "offset": 85380
+   },
+   {
+    "level": 2,
+    "heading": "==Explanatory notes==",
+    "offset": 85635
+   },
+   {
+    "level": 2,
+    "heading": "==References==",
+    "offset": 85671
+   },
+   {
+    "level": 3,
+    "heading": "===Citations===",
+    "offset": 85686
+   },
+   {
+    "level": 3,
+    "heading": "===General and cited sources===",
+    "offset": 85715
+   },
+   {
+    "level": 2,
+    "heading": "==Further reading==",
+    "offset": 90797
+   },
+   {
+    "level": 2,
+    "heading": "==External links==",
+    "offset": 91363
+   }
+  ]
+ },
+ "diff": [
+  {
+   "type": 0,
+   "lineNumber": 31,
+   "text": "'''Augusta Ada King, Countess of Lovelace''' ({{née|'''Byron'''}}; 10 December 1815 – 27 November 1852), also known as '''Ada Lovelace''', was an English [[mathematician]] and [[writer]] chiefly known for work on [[Charles Babbage]]'s proposed mechanical general-purpose [[computer]], the [[analytical engine]]. She was the first to recognise the machine had applications beyond pure calculation. Lovelace is often considered the first computer programmer.",
+   "offset": {
+    "from": 1669,
+    "to": 1669
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 32,
+   "text": "",
+   "offset": {
+    "from": 2129,
+    "to": 2129
+   }
+  },
+  {
+   "type": 3,
+   "lineNumber": 33,
+   "text": "Lovelace was the only legitimate child of poet [[Lord Byron]] and reformer [[Anne Isabella Milbanke]].<ref>{{cite web|url=https://www.biography.com/people/ada-lovelace-20825323|title=Ada Lovelace Biography|website=biography.com|date=6 May 2021 }}</ref> All her half-siblings, [[Lord Byron#Children|Lord Byron's other children]], were born out of [[wedlock]] to other women.<ref name= ABCL/> Lord Byron separated from his wife a month after Ada was born, and leftdied [[England]]when forevershe was eight. HeAlthough diedoften ill in [[Greece]]childhood, duringLovelace thepursued her studies assiduously. She married [[GreekWilliam WarKing-Noel, 1st Earl of IndependenceLovelace|William King]], whenin she1835. King was eight.a LadyBaron, Byronand was anxiouscreated aboutViscount herOckham daughter'sand upbringing1st and[[Earl promotedof Lovelace's interest]] in mathematics1838. andThe logic,name toLovelace preventwas herchosen developingbecause herAda father'swas descended from the perceivedextinct [[insanityBaron Lovelace]]s.<ref>{{Citation Despite|last=Jaeger this,|first=Lars |title=Ada Lovelace remained(1815–1852): interestedInventor inof herComputer father,Algorithms naming|date=2023 one|work=Women sonof [[ByronGenius King-Noel,in ViscountScience Ockham|Byron]] and: theWhose other,Frequently forOverlooked herContributions father'sChanged middlethe name,World [[Ralph|pages=71–82 King|editor-Milbanke,last=Jaeger 2nd|editor-first=Lars Earl|url=https://doi.org/10.1007/978-3-031-23926-7_7 of|access-date=2025-09-30 Lovelace|Gordon]]place=Cham |publisher=Springer International Publishing |language=en |doi=10.1007/978-3-031-23926-7_7 Lovelace|isbn=978-3-031-23926-7|url-access=subscription was}}</ref> buriedThe nexttitle given to her fatherhusband atthus hermade requestAda the Countess of Lovelace.",
+   "offset": {
+    "from": 2130,
+    "to": 2130
+   },
+   "highlightRanges": [
+    {
+     "start": 251,
+     "length": 138,
+     "type": 1
+    },
+    {
+     "start": 458,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 462,
+     "length": 4,
+     "type": 0
+    },
+    {
+     "start": 467,
+     "length": 11,
+     "type": 1
+    },
+    {
+     "start": 478,
+     "length": 4,
+     "type": 0
+    },
+    {
+     "start": 483,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 490,
+     "length": 13,
+     "type": 0
+    },
+    {
+     "start": 505,
+     "length": 2,
+     "type": 1
+    },
+    {
+     "start": 507,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 516,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 520,
+     "length": 9,
+     "type": 0
+    },
+    {
+     "start": 533,
+     "length": 10,
+     "type": 1
+    },
+    {
+     "start": 543,
+     "length": 10,
+     "type": 0
+    },
+    {
+     "start": 554,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 560,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 569,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 572,
+     "length": 44,
+     "type": 0
+    },
+    {
+     "start": 619,
+     "length": 5,
+     "type": 1
+    },
+    {
+     "start": 624,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 632,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 635,
+     "length": 19,
+     "type": 0
+    },
+    {
+     "start": 658,
+     "length": 12,
+     "type": 1
+    },
+    {
+     "start": 670,
+     "length": 21,
+     "type": 0
+    },
+    {
+     "start": 693,
+     "length": 1,
+     "type": 1
+    },
+    {
+     "start": 695,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 699,
+     "length": 2,
+     "type": 0
+    },
+    {
+     "start": 702,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 705,
+     "length": 10,
+     "type": 0
+    },
+    {
+     "start": 720,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 726,
+     "length": 1,
+     "type": 0
+    },
+    {
+     "start": 728,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 732,
+     "length": 6,
+     "type": 0
+    },
+    {
+     "start": 739,
+     "length": 5,
+     "type": 1
+    },
+    {
+     "start": 744,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 752,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 759,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 767,
+     "length": 5,
+     "type": 1
+    },
+    {
+     "start": 772,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 781,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 784,
+     "length": 6,
+     "type": 0
+    },
+    {
+     "start": 791,
+     "length": 10,
+     "type": 1
+    },
+    {
+     "start": 801,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 805,
+     "length": 10,
+     "type": 1
+    },
+    {
+     "start": 815,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 819,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 822,
+     "length": 6,
+     "type": 0
+    },
+    {
+     "start": 829,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 837,
+     "length": 2,
+     "type": 0
+    },
+    {
+     "start": 848,
+     "length": 11,
+     "type": 1
+    },
+    {
+     "start": 859,
+     "length": 2,
+     "type": 0
+    },
+    {
+     "start": 865,
+     "length": 11,
+     "type": 1
+    },
+    {
+     "start": 876,
+     "length": 5,
+     "type": 0
+    },
+    {
+     "start": 882,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 885,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 889,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 895,
+     "length": 4,
+     "type": 0
+    },
+    {
+     "start": 900,
+     "length": 2,
+     "type": 1
+    },
+    {
+     "start": 902,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 911,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 918,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 922,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 925,
+     "length": 6,
+     "type": 0
+    },
+    {
+     "start": 932,
+     "length": 10,
+     "type": 1
+    },
+    {
+     "start": 942,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 950,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 953,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 957,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 965,
+     "length": 22,
+     "type": 0
+    },
+    {
+     "start": 988,
+     "length": 9,
+     "type": 1
+    },
+    {
+     "start": 997,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 1007,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1015,
+     "length": 14,
+     "type": 0
+    },
+    {
+     "start": 1031,
+     "length": 1,
+     "type": 0
+    },
+    {
+     "start": 1033,
+     "length": 15,
+     "type": 0
+    },
+    {
+     "start": 1049,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 1056,
+     "length": 12,
+     "type": 0
+    },
+    {
+     "start": 1069,
+     "length": 5,
+     "type": 1
+    },
+    {
+     "start": 1074,
+     "length": 22,
+     "type": 0
+    },
+    {
+     "start": 1106,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1114,
+     "length": 14,
+     "type": 0
+    },
+    {
+     "start": 1129,
+     "length": 10,
+     "type": 1
+    },
+    {
+     "start": 1139,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 1148,
+     "length": 2,
+     "type": 1
+    },
+    {
+     "start": 1150,
+     "length": 2,
+     "type": 0
+    },
+    {
+     "start": 1153,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1156,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 1165,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 1172,
+     "length": 10,
+     "type": 0
+    },
+    {
+     "start": 1183,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 1189,
+     "length": 10,
+     "type": 0
+    },
+    {
+     "start": 1200,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1203,
+     "length": 11,
+     "type": 0
+    },
+    {
+     "start": 1215,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1218,
+     "length": 2,
+     "type": 0
+    },
+    {
+     "start": 1221,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 1228,
+     "length": 6,
+     "type": 0
+    },
+    {
+     "start": 1235,
+     "length": 10,
+     "type": 1
+    },
+    {
+     "start": 1245,
+     "length": 2,
+     "type": 0
+    },
+    {
+     "start": 1248,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1256,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 1264,
+     "length": 14,
+     "type": 1
+    },
+    {
+     "start": 1279,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1282,
+     "length": 1,
+     "type": 0
+    },
+    {
+     "start": 1284,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1287,
+     "length": 5,
+     "type": 0
+    },
+    {
+     "start": 1293,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 1299,
+     "length": 10,
+     "type": 0
+    },
+    {
+     "start": 1310,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1313,
+     "length": 10,
+     "type": 0
+    },
+    {
+     "start": 1324,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1327,
+     "length": 13,
+     "type": 0
+    },
+    {
+     "start": 1341,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1349,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 1357,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 1363,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 1367,
+     "length": 5,
+     "type": 1
+    },
+    {
+     "start": 1372,
+     "length": 5,
+     "type": 0
+    },
+    {
+     "start": 1378,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 1385,
+     "length": 14,
+     "type": 0
+    },
+    {
+     "start": 1400,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 1404,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 1412,
+     "length": 9,
+     "type": 1
+    },
+    {
+     "start": 1421,
+     "length": 11,
+     "type": 0
+    },
+    {
+     "start": 1433,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1436,
+     "length": 18,
+     "type": 0
+    },
+    {
+     "start": 1455,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 1459,
+     "length": 48,
+     "type": 0
+    },
+    {
+     "start": 1508,
+     "length": 2,
+     "type": 1
+    },
+    {
+     "start": 1510,
+     "length": 23,
+     "type": 0
+    },
+    {
+     "start": 1534,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1543,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1551,
+     "length": 76,
+     "type": 0
+    },
+    {
+     "start": 1628,
+     "length": 24,
+     "type": 0
+    },
+    {
+     "start": 1653,
+     "length": 8,
+     "type": 1
+    },
+    {
+     "start": 1661,
+     "length": 47,
+     "type": 0
+    },
+    {
+     "start": 1709,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1712,
+     "length": 8,
+     "type": 0
+    },
+    {
+     "start": 1721,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 1727,
+     "length": 3,
+     "type": 0
+    },
+    {
+     "start": 1731,
+     "length": 4,
+     "type": 1
+    },
+    {
+     "start": 1735,
+     "length": 11,
+     "type": 0
+    },
+    {
+     "start": 1754,
+     "length": 6,
+     "type": 1
+    },
+    {
+     "start": 1760,
+     "length": 7,
+     "type": 0
+    },
+    {
+     "start": 1768,
+     "length": 2,
+     "type": 1
+    },
+    {
+     "start": 1770,
+     "length": 4,
+     "type": 0
+    },
+    {
+     "start": 1775,
+     "length": 3,
+     "type": 1
+    },
+    {
+     "start": 1778,
+     "length": 4,
+     "type": 0
+    },
+    {
+     "start": 1783,
+     "length": 7,
+     "type": 1
+    },
+    {
+     "start": 1790,
+     "length": 28,
+     "type": 0
+    }
+   ]
+  },
+  {
+   "type": 2,
+   "text": "",
+   "offset": {
+    "from": 3145,
+    "to": null
+   }
+  },
+  {
+   "type": 2,
+   "text": "Although often ill in childhood, Lovelace pursued her studies assiduously. She married [[William King-Noel, 1st Earl of Lovelace|William King]] in 1835. King was a Baron, and was created Viscount Ockham and 1st [[Earl of Lovelace]] in 1838. The name Lovelace was chosen because Ada was descended from the extinct [[Baron Lovelace]]s.<ref>{{Citation |last=Jaeger |first=Lars |title=Ada Lovelace (1815–1852): Inventor of Computer Algorithms |date=2023 |work=Women of Genius in Science  : Whose Frequently Overlooked Contributions Changed the World |pages=71–82 |editor-last=Jaeger |editor-first=Lars |url=https://doi.org/10.1007/978-3-031-23926-7_7 |access-date=2025-09-30 |place=Cham |publisher=Springer International Publishing |language=en |doi=10.1007/978-3-031-23926-7_7 |isbn=978-3-031-23926-7|url-access=subscription }}</ref> The title given to her husband thus made Ada the Countess of Lovelace.",
+   "offset": {
+    "from": 3146,
+    "to": null
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 34,
+   "text": "",
+   "offset": {
+    "from": 4052,
+    "to": 3381
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 35,
+   "text": "Lovelace's educational and social exploits brought her into contact with scientists such as [[Andrew Crosse]], [[Charles Babbage]], [[David Brewster]], [[Charles Wheatstone]] and [[Michael Faraday]], and the author [[Charles Dickens]], contacts which she used to further her education. Lovelace described her approach as \"poetical science\"{{Sfn|Toole|1998|pp=234–235}} and herself as an \"Analyst (& [[Metaphysics|Metaphysician]])\".{{Sfn|Toole|1998|pp=156–157}} When she was eighteen, Lovelace's mathematical talents led her to a long working relationship and friendship with fellow British mathematician Charles Babbage. She was particularly interested in Babbage's work on the [[analytical engine]]. Lovelace first met him on 5 June 1833, when she and her mother attended one of [[Charles Babbage's Saturday night soirées]]<ref>{{Cite book |last=Toole |first=Betty Alexandra |title=Ada, the Enchantress of Numbers:Poetical Science |date=2010 |publisher=Critical Connection |edition=Kindle |pages=Location 641}}</ref> with their mutual friend, and Lovelace's private tutor, [[Mary Somerville]].",
+   "offset": {
+    "from": 4053,
+    "to": 3382
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 36,
+   "text": "",
+   "offset": {
+    "from": 5153,
+    "to": 4482
+   }
+  },
+  {
+   "type": 3,
+   "lineNumber": 37,
+   "text": "Though Babbage's Analytical Engine was never constructed and did not influence on the invention of electronic computers, it has been recognised as a [[Turing completeness|Turing-complete]] general-purpose computer, which anticipated the essential features of a modern electronic computer. Babbage is therefore known as the \"father of computers,\" and Lovelace is credited with several computing \"firsts\" for her collaboration with him. Between 1842-43, Lovelace translated [[wikisource:Scientific Memoirs/3/Sketch of the Analytical Engine invented by Charles Babbage, Esq.|an article]] by the military engineer [[Luigi Menabrea]] about the Analytical Engine, supplementing it with [[wikisource:Scientific Memoirs/3/Sketch of the Analytical Engine invented by Charles Babbage, Esq./Notes by the Translator|seven long explanatory notes]].<!--this is an inappropriate way of linking this material -- maybe a marginal box or something, but that can't be in the lead--> These described a method of using the machine to calculate [[Bernoulli number]]s which is often called the first published [[computer program]]. She developed a vision of the capability of computers to go beyond mere calculating or number-crunching, while many others, including Babbage, focused only on those capabilities.{{Sfn|Fuegi|Francis|2003|pp=19, 25}} Lovelace was the first to point out the possibility of encoding information besides mere arithmetical figures, such as music, and manipulating it with such a machine. Her mindset of \"poetical science\" led her to ask questions about the analytical engine, examining how individuals and society relate to technology as a collaborative tool.<ref name=\"ABCL\">{{Citation|last=Toole|first=Betty Alexandra|title=Poetical Science|journal=The Byron Journal|volume=15|year=1987|pages=55–65|doi=10.3828/bj.1987.6}}.</ref> Ada is widely commemorated, including in the names of a programming language, roads, buildings and institutes, as well as programmes, lectures and courses. There are plaques, statues, paintings, literary and non-fiction works.",
+   "offset": {
+    "from": 5154,
+    "to": 4483
+   },
+   "highlightRanges": [
+    {
+     "start": 434,
+     "length": 17,
+     "type": 1
+    },
+    {
+     "start": 1107,
+     "length": 955,
+     "type": 0
+    }
+   ]
+  },
+  {
+   "type": 2,
+   "text": "",
+   "offset": {
+    "from": 6263,
+    "to": null
+   }
+  },
+  {
+   "type": 2,
+   "text": "She developed a vision of the capability of computers to go beyond mere calculating or number-crunching, while many others, including Babbage, focused only on those capabilities.{{Sfn|Fuegi|Francis|2003|pp=19, 25}} Lovelace was the first to point out the possibility of encoding information besides mere arithmetical figures, such as music, and manipulating it with such a machine. Her mindset of \"poetical science\" led her to ask questions about the analytical engine, examining how individuals and society relate to technology as a collaborative tool.<ref name=\"ABCL\">{{Citation|last=Toole|first=Betty Alexandra|title=Poetical Science|journal=The Byron Journal|volume=15|year=1987|pages=55–65|doi=10.3828/bj.1987.6}}.</ref> Ada is widely commemorated, including in the names of a programming language, roads, buildings and institutes, as well as programmes, lectures and courses. There are plaques, statues, paintings, literary and non-fiction works.",
+   "offset": {
+    "from": 6264,
+    "to": null
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 38,
+   "text": "",
+   "offset": {
+    "from": 7219,
+    "to": 6530
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 39,
+   "text": "==Biography==",
+   "offset": {
+    "from": 7220,
+    "to": 6531
+   }
+  }
+ ]
+}
