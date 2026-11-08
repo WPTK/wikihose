@@ -152,5 +152,9 @@ What the test showed:
   series by `timestamp`, never by position, and fill missing days with zero.
 - Per-article history for a 30-day window returned 29 to 30 items for a steady article (the newest day can be absent).
 
+The top-50 pick uses the bounded score, so a page that is rarely in the top 1,000 can have a real spike larger than
+its bound and miss the exact fetch. The ranking is therefore approximate beyond the exact rows; the Reading tab should
+say so (a tilde on bounded rows).
+
 Spike (owner's choice, 7 Nov 2026): today's views divided by the 30-day median, shown only for pages with at least 5,000
 views today. The Reading tab shows 25 rows by default.

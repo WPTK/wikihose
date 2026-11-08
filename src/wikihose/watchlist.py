@@ -10,6 +10,7 @@ not newer than the newest one known, so an edit seen live and again in the catch
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
@@ -44,14 +45,27 @@ def api_url(wiki: str) -> str:
 
 
 class Watchlist:
-    def __init__(self, store: Store, client: Client, clock: Clock) -> None:
+    def __init__(self, store: Store, client: Client | None, clock: Clock) -> None:
+        """``client`` is None when there is no network (a replay): pages can be matched and listed but not added."""
         self._store = store
         self._client = client
         self._clock = clock
+        self._listeners: list[Callable[[], None]] = []
         self._pages: dict[tuple[str, int], WatchedPage] = {}
         self._titles: dict[tuple[str, str], int] = {}  # (wiki, normalized title) -> page ID
         for page in store.watched_pages():
             self._put(page)
+
+    def subscribe(self, listener: Callable[[], None]) -> None:
+        """Call ``listener`` after every change to the list or to a page's counts."""
+        self._listeners.append(listener)
+
+    def __contains__(self, page: object) -> bool:
+        """``(wiki, title) in watchlist``, from memory."""
+        return isinstance(page, tuple) and len(page) == 2 and self.match(*page) is not None
+
+    def __len__(self) -> int:
+        return len(self._pages)
 
     # --- reading -----------------------------------------------------------------------------------------------------
 
@@ -81,6 +95,8 @@ class Watchlist:
             url = api_url(wiki)
         except ValueError:
             raise WatchError(f"wikihose cannot watch pages on {wiki} yet.") from None
+        if self._client is None:
+            raise WatchError("Adding a page needs a connection to Wikipedia, and this session has none.")
         asked = page_key(wiki, title)[1]
         params = {
             "action": "query",
@@ -121,6 +137,7 @@ class Watchlist:
         self._store.remove_watch(page.wiki, page.page_id)
         del self._pages[(page.wiki, page.page_id)]
         self._titles.pop(page_key(current.wiki, current.title), None)
+        self._changed()
         return True
 
     # --- live changes ------------------------------------------------------------------------------------------------
@@ -172,7 +189,12 @@ class Watchlist:
     def _put(self, page: WatchedPage) -> WatchedPage:
         self._pages[(page.wiki, page.page_id)] = page
         self._titles[page_key(page.wiki, page.title)] = page.page_id
+        self._changed()
         return page
+
+    def _changed(self) -> None:
+        for listener in list(self._listeners):
+            listener()
 
     def _save(self, page: WatchedPage) -> WatchedPage:
         self._store.set_watch_state(

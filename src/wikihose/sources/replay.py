@@ -18,6 +18,7 @@ from wikihose.sources.recording import read_recording
 
 MIN_SPEED = 0.5
 MAX_SPEED = 16.0
+BURST = 100  # items handed out back to back before the loop is given a turn
 MAX_STEP = 0.5  # longest single wait, in seconds, so pause, speed and skip take effect quickly
 
 
@@ -68,6 +69,7 @@ class ReplaySource:
 
     async def items(self) -> AsyncIterator[StreamItem]:
         yield FeedStatus("stream", "ok", at=self.moment())
+        run = 0  # items yielded since the loop last got a turn
         for event in self._events:
             if self._closed:
                 break
@@ -78,12 +80,17 @@ class ReplaySource:
                 gap = event.t - self._elapsed
                 step = min(gap, MAX_STEP * self._speed)
                 await self.clock.sleep(step / self._speed)
+                run = 0
                 self._elapsed = max(self._elapsed, event.t) if step == gap else self._elapsed + step
             if self._closed:
                 break
             item, _ = parse_event(event.data)
             if item is not None:
                 yield item
+                run += 1
+                if run >= BURST:  # a recording with many events at one instant must not starve key presses
+                    run = 0
+                    await self.clock.sleep(0)
         yield FeedStatus("stream", "down", detail="replay finished", at=self.moment())
 
     async def aclose(self) -> None:

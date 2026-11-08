@@ -82,3 +82,12 @@ def test_never_raises_and_a_plain_title_is_kept(title: str) -> None:
     flt.is_article(title)
     if ":" not in title and title.strip() and title.strip().casefold() != "main page":
         assert flt.is_article(title)
+
+
+@given(
+    st.recursive(
+        st.none() | st.booleans() | st.integers() | st.text(), lambda i: st.lists(i) | st.dictionaries(st.text(), i)
+    )
+)
+def test_from_siteinfo_survives_any_json(payload: object) -> None:
+    NamespaceFilter.from_siteinfo(payload).is_article("Anything:Goes")
