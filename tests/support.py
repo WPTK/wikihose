@@ -95,3 +95,22 @@ async def wait_for_stream(app: WikihoseApp, pilot: Any) -> None:
             return
         await pilot.pause()
     raise AssertionError("the source never finished")
+
+
+async def footer_keys(pilot: Any, app: WikihoseApp, *, needing: str | None = None) -> list[Any]:
+    """The footer's key widgets once they exist (and, with ``needing``, one whose label contains it).
+
+    The footer rebuilds its keys asynchronously after bindings change, so a single ``pilot.pause()`` can be too early on
+    a slow machine. This yields to the event loop until they are there, without any wall-clock wait.
+    """
+    for _ in range(50):
+        keys = list(app.query("FooterKey"))
+        if keys and (needing is None or any(needing in str(k.render()) for k in keys)):
+            return keys
+        await pilot.pause()
+    seen = [str(k.render()) for k in app.query("FooterKey")]
+    raise AssertionError(f"the footer never showed a key containing {needing!r}; it shows {seen}")
+
+
+def footer_text(keys: list[Any]) -> str:
+    return " ".join(str(k.render()) for k in keys)
