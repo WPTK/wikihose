@@ -8,6 +8,15 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 _WHITESPACE = re.compile(r"\s+")
 _HOST = re.compile(r"^(?P<lang>[a-z][a-z0-9-]*)(?:\.m)?\.(?P<project>wikipedia|wiktionary)\.org$")
 _WIKI_NAMES = {"wikipedia": "wiki", "wiktionary": "wiktionary"}
+_WIKI_NAME = re.compile(r"^(?P<lang>[a-z]{2,}(?:_[a-z0-9]+)*)(?P<project>wiktionary|wiki)$")
+# Database names that look like a language edition but live on a different site.
+_NOT_EDITIONS = frozenset(
+    {
+        "commons", "wikidata", "meta", "species", "mediawiki", "foundation", "outreach", "sources", "incubator",
+        "nostalgia", "login", "vote", "test", "test2", "usability", "strategy", "wikimania", "labs", "office",
+        "advisory", "collab", "internal", "private",
+    }
+)  # fmt: skip
 _WIKIMEDIA_HOST = re.compile(
     r"[a-z0-9-]+(\.[a-z0-9-]+)*\.(wikipedia|wiktionary|wikibooks|wikiquote|wikisource|wikinews|wikiversity|wikivoyage"
     r"|wikimedia|wikidata|mediawiki)\.org"
@@ -57,6 +66,18 @@ def title_from_url(text: str) -> tuple[str, str] | None:
     if not title:
         return None
     return page_key(wiki, title)
+
+
+def host_for_wiki(wiki: str) -> str | None:
+    """The web host of a wiki database name: ``enwiki`` gives en.wikipedia.org, ``be_x_oldwiki`` gives
+    be-x-old.wikipedia.org and ``frwiktionary`` gives fr.wiktionary.org. None for anything else, such as
+    ``commonswiki``.
+    """
+    match = _WIKI_NAME.match(wiki)
+    if match is None or match["lang"] in _NOT_EDITIONS:
+        return None
+    project = "wikipedia" if match["project"] == "wiki" else "wiktionary"
+    return f"{match['lang'].replace('_', '-')}.{project}.org"
 
 
 def valid_host(host: str) -> bool:

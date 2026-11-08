@@ -57,7 +57,8 @@ class TopBar(Horizontal):
 
 
 class HealthBar(Static):
-    """Hidden while every feed is ok. While one is not, names it and says why."""
+    """Hidden while every feed is ok. While one is not, names it and says why. It can also carry one line of progress
+    (``set_note``), such as the startup check of the watched pages; a failing feed takes the line over."""
 
     DEFAULT_CSS = """
     HealthBar { height: 1; background: $panel; padding: 0 1; display: none; }
@@ -67,6 +68,7 @@ class HealthBar(Static):
     def __init__(self) -> None:
         super().__init__(id="health")
         self._failing: dict[str, FeedStatus] = {}
+        self._note = ""
 
     @property
     def failing(self) -> list[FeedStatus]:
@@ -79,8 +81,20 @@ class HealthBar(Static):
             self._failing[status.feed] = status
         self._redraw()
 
+    @property
+    def note(self) -> str:
+        return self._note
+
+    def set_note(self, text: str) -> None:
+        """Show ``text`` while all feeds are ok; an empty string removes it."""
+        self._note = text
+        self._redraw()
+
     def _redraw(self) -> None:
-        self.set_class(bool(self._failing), "-failing")
+        self.set_class(bool(self._failing or self._note), "-failing")
+        if not self._failing:
+            self.update(Content.assemble((self._note, "$text-muted")))
+            return
         parts: list[Content | tuple[str, str]] = []
         for status in self._failing.values():
             colour = "$error" if status.state == "down" else "$warning"

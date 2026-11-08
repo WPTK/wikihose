@@ -7,11 +7,12 @@ from datetime import date
 from typing import Any
 
 import pytest
-from support import ListSource, footer_keys, make_app
+import respx
+from support import ListSource, action_api, finish_work, footer_keys, make_app
 from textual.widgets import DataTable, Static
 
 from wikihose.clock import VirtualClock
-from wikihose.net import FetchError
+from wikihose.net import Client, FetchError
 from wikihose.reading import Progress, SpikeRow, Summary
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.tabs.reading import (
@@ -229,13 +230,15 @@ async def test_a_replay_has_no_reading_data(clock: VirtualClock) -> None:
         assert "needs a live connection" in status(app)
 
 
-async def test_w_on_a_reading_row_watches_that_page(clock: VirtualClock) -> None:
-    app = reading_app(clock, FakeReading())
+@respx.mock
+async def test_w_on_a_reading_row_watches_that_page(clock: VirtualClock, client: Client) -> None:
+    action_api((7, "Page 0", 70))
+    app = reading_app(clock, FakeReading(), client=client)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press("2")
         await settle_reading(app, pilot)
         await pilot.press("w")
-        await pilot.pause()
+        await finish_work(app, pilot)
         assert ("enwiki", "Page 0") in app.watchlist
 
 
@@ -277,7 +280,7 @@ async def test_help_on_the_reading_tab_lists_its_keys(clock: VirtualClock) -> No
         await pilot.press("2")
         await pilot.press("question_mark")
         await pilot.pause()
-        assert help_keys(app) == ["r", "n", "w", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert help_keys(app) == ["r", "n", "w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
 
 
 async def test_n_and_r_in_a_replay_keep_the_replay_message(clock: VirtualClock) -> None:

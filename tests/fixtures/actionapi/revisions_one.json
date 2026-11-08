@@ -1,0 +1,418 @@
+{
+ "continue": {
+  "rvcontinue": "20250915093159|1311464851",
+  "continue": "||"
+ },
+ "query": {
+  "pages": [
+   {
+    "pageid": 974,
+    "ns": 0,
+    "title": "Ada Lovelace",
+    "revisions": [
+     {
+      "revid": 1384127064,
+      "parentid": 1383337217,
+      "user": "Vitorperrut555",
+      "timestamp": "2026-11-06T19:02:23Z",
+      "size": 98391,
+      "comment": "Copying from [[Category:British women computer scientists]] to [[Category:British computer scientists]] using [[c:Help:Cat-a-lot|Cat-a-lot]]"
+     },
+     {
+      "revid": 1383337217,
+      "parentid": 1381003492,
+      "user": "InternetArchiveBot",
+      "timestamp": "2026-11-02T04:50:13Z",
+      "size": 98350,
+      "comment": "Rescuing 1 sources and tagging 0 as dead. #IABot (v2.0.9.6)"
+     },
+     {
+      "revid": 1381003492,
+      "parentid": 1380448378,
+      "user": "OAbot",
+      "timestamp": "2026-10-19T10:59:10Z",
+      "size": 98154,
+      "comment": "[[Wikipedia:OABOT|Open access bot]]: doi updated in citation with #oabot."
+     },
+     {
+      "revid": 1380448378,
+      "parentid": 1379797630,
+      "user": "Izzardus",
+      "timestamp": "2026-10-15T19:38:07Z",
+      "size": 98137,
+      "comment": "Allan Bromley was not introduced the first time he was mentioned"
+     },
+     {
+      "revid": 1379797630,
+      "parentid": 1376338287,
+      "user": "Malek Djerbal",
+      "timestamp": "2026-10-12T00:40:30Z",
+      "size": 98088,
+      "comment": "double link"
+     },
+     {
+      "revid": 1376338287,
+      "parentid": 1374881938,
+      "user": "MrOllie",
+      "timestamp": "2026-09-23T15:04:38Z",
+      "size": 98092,
+      "comment": "/* See also */ insufficiently notable"
+     },
+     {
+      "revid": 1374881938,
+      "parentid": 1371961179,
+      "user": "JohnMizuki",
+      "timestamp": "2026-09-14T16:33:37Z",
+      "size": 98142,
+      "comment": "Portrait added"
+     },
+     {
+      "revid": 1371961179,
+      "parentid": 1371775438,
+      "user": "ZackBot",
+      "timestamp": "2026-08-29T16:16:29Z",
+      "size": 97971,
+      "comment": "fixing infobox and removing [[Category:Pages using infobox scientist with deprecated parameters|deprecated parameters]] for Infobox scientist ([[Wikipedia:Bots/Requests for approval/ZackBot 14|ZackBot 14]])"
+     },
+     {
+      "revid": 1371775438,
+      "parentid": 1371775042,
+      "user": "Jevansen",
+      "timestamp": "2026-08-28T11:01:55Z",
+      "size": 97989,
+      "comment": "Removing from [[Category:19th-century English women writers]] diffused using [[c:Help:Cat-a-lot|Cat-a-lot]]"
+     },
+     {
+      "revid": 1371775042,
+      "parentid": 1370153024,
+      "user": "Jevansen",
+      "timestamp": "2026-08-28T10:57:26Z",
+      "size": 98037,
+      "comment": "Moving from [[Category:English women poets]] to [[Category:19th-century English women poets]] using [[c:Help:Cat-a-lot|Cat-a-lot]]"
+     },
+     {
+      "revid": 1370153024,
+      "parentid": 1360639004,
+      "user": "Python Drink",
+      "timestamp": "2026-08-19T11:48:44Z",
+      "size": 98024,
+      "comment": "/* */"
+     },
+     {
+      "revid": 1360639004,
+      "parentid": 1359380954,
+      "user": "CitationCleanerBot",
+      "timestamp": "2026-06-22T18:42:17Z",
+      "size": 98036,
+      "comment": "/* top */ clean up of [[:Category:CS1 maint: work parameter with ISBN]], see [[Wikipedia:Bots/Requests for approval/CitationCleanerBot 7]]"
+     },
+     {
+      "revid": 1359380954,
+      "parentid": 1359106641,
+      "user": "Silver seren",
+      "timestamp": "2026-06-14T23:30:01Z",
+      "size": 98054,
+      "comment": "Wikilink"
+     },
+     {
+      "revid": 1359106641,
+      "parentid": 1357357898,
+      "user": "Elirbosley",
+      "timestamp": "2026-06-13T03:39:47Z",
+      "size": 98023,
+      "comment": ""
+     },
+     {
+      "revid": 1357357898,
+      "parentid": 1355692413,
+      "user": "Saltmarsh",
+      "timestamp": "2026-06-02T05:01:12Z",
+      "size": 98012,
+      "comment": "/* Education */ link mary somerville"
+     },
+     {
+      "revid": 1355692413,
+      "parentid": 1355654916,
+      "user": "Arjayay",
+      "timestamp": "2026-05-23T09:47:50Z",
+      "size": 98008,
+      "comment": "Duplicate word removed"
+     },
+     {
+      "revid": 1355654916,
+      "parentid": 1355651967,
+      "user": "LokiTheLiar",
+      "timestamp": "2026-05-23T03:00:36Z",
+      "size": 98011,
+      "comment": "/* Insight into potential of computing devices */ [[MOS:DATEFORMAT]]"
+     },
+     {
+      "revid": 1355651967,
+      "parentid": 1353973652,
+      "user": "LokiTheLiar",
+      "timestamp": "2026-05-23T02:35:48Z",
+      "size": 98006,
+      "comment": "/* Insight into potential of computing devices */ clarify the Objection and add a better non-primary source for its significance"
+     },
+     {
+      "revid": 1353973652,
+      "parentid": 1352978808,
+      "user": "Kaspar-trout",
+      "timestamp": "2026-05-13T14:17:29Z",
+      "size": 97454,
+      "comment": "/* Further reading */ inserted new  reference"
+     },
+     {
+      "revid": 1352978808,
+      "parentid": 1352978273,
+      "user": "IrisChronomia",
+      "timestamp": "2026-05-07T12:07:56Z",
+      "size": 97350,
+      "comment": "/* Commemoration */ Same as last edit; replaced ref from early news report to just nvidia's own page showing the arch's name."
+     },
+     {
+      "revid": 1352978273,
+      "parentid": 1352824194,
+      "user": "IrisChronomia",
+      "timestamp": "2026-05-07T12:00:48Z",
+      "size": 97483,
+      "comment": "shortened sentence describing nvidia's microarchitecture. new sentence is as follows: \"The 2022 graphics processor microarchitecture from Nvidia is named Ada Lovelace.\" with the last two words linking to the µarch."
+     },
+     {
+      "revid": 1352824194,
+      "parentid": 1350401250,
+      "user": "Ken Gallager",
+      "timestamp": "2026-05-06T12:58:52Z",
+      "size": 97466,
+      "comment": "cat sort"
+     },
+     {
+      "revid": 1350401250,
+      "parentid": 1344675725,
+      "user": "Lomekwian Llama",
+      "timestamp": "2026-04-21T19:10:58Z",
+      "size": 97462,
+      "comment": "Added links, fixed inconsistent capitalisation, fixed paragraph breaks, fixed wording regarding tributes to her"
+     },
+     {
+      "revid": 1344675725,
+      "parentid": 1344641820,
+      "user": "Xxanthippe",
+      "timestamp": "2026-03-21T22:20:12Z",
+      "size": 97343,
+      "comment": "Reverted [[WP:AGF|good faith]] edits by [[Special:Contributions/Tim.sneller|Tim.sneller]] ([[User talk:Tim.sneller|talk]]): {{cn}}"
+     },
+     {
+      "revid": 1344641820,
+      "parentid": 1341435129,
+      "user": "Tim.sneller",
+      "timestamp": "2026-03-21T18:14:06Z",
+      "size": 97377,
+      "comment": "Added item to OTHER commemoration."
+     },
+     {
+      "revid": 1341435129,
+      "parentid": 1337976516,
+      "user": "EEng",
+      "timestamp": "2026-03-03T05:22:11Z",
+      "size": 97343,
+      "comment": "/* Insight into potential of computing devices */ See talk. I'm not even sure why we're discussing objections here to a very common idea not unique to Ada"
+     },
+     {
+      "revid": 1337976516,
+      "parentid": 1337855710,
+      "user": "Jcejhay",
+      "timestamp": "2026-02-12T14:11:15Z",
+      "size": 98106,
+      "comment": "/* Novels, plays and poetry */ Better source."
+     },
+     {
+      "revid": 1337855710,
+      "parentid": 1336975339,
+      "user": "Jcejhay",
+      "timestamp": "2026-02-11T21:00:11Z",
+      "size": 98131,
+      "comment": "/* In popular culture */ Randall poem (and subsection heading)."
+     },
+     {
+      "revid": 1336975339,
+      "parentid": 1336279000,
+      "user": "ThunderPeel2001",
+      "timestamp": "2026-02-06T19:43:50Z",
+      "size": 97760,
+      "comment": "/* Controversy over contribution */ Add better context"
+     },
+     {
+      "revid": 1336279000,
+      "parentid": 1335596709,
+      "user": "ArtemisiaGentileschiFan",
+      "timestamp": "2026-02-02T22:07:26Z",
+      "size": 97694,
+      "comment": "New statue"
+     },
+     {
+      "revid": 1335596709,
+      "parentid": 1332828530,
+      "user": "Citation bot",
+      "timestamp": "2026-01-30T02:58:57Z",
+      "size": 97348,
+      "comment": "Altered work. Add: date, title, bibcode. Changed bare reference to CS1/2. | [[:en:WP:UCB|Use this bot]]. [[:en:WP:DBUG|Report bugs]]. | Suggested by Abductive | #UCB_toolbar"
+     },
+     {
+      "revid": 1332828530,
+      "parentid": 1331842436,
+      "user": "Mae100",
+      "timestamp": "2026-01-14T03:01:56Z",
+      "size": 97155,
+      "comment": "/* Commemoration'Ada Lovelace Day' redirects here */ Added NPG acquisition of Lovelace portraits"
+     },
+     {
+      "revid": 1331842436,
+      "parentid": 1330237300,
+      "user": "Schazjmd",
+      "timestamp": "2026-01-08T13:57:02Z",
+      "size": 95957,
+      "comment": "grammar, see talk"
+     },
+     {
+      "revid": 1330237300,
+      "parentid": 1330237185,
+      "user": "Nikkimaria",
+      "timestamp": "2025-12-30T05:31:26Z",
+      "size": 95960,
+      "comment": "rework lead"
+     },
+     {
+      "revid": 1330237185,
+      "parentid": 1329308968,
+      "user": "Nikkimaria",
+      "timestamp": "2025-12-30T05:29:48Z",
+      "size": 96649,
+      "comment": "ce"
+     },
+     {
+      "revid": 1329308968,
+      "parentid": 1328372604,
+      "user": "David Eppstein",
+      "timestamp": "2025-12-25T05:26:04Z",
+      "size": 96776,
+      "comment": "/* Computing and STEM */ nothing like that found on Oxford web site"
+     },
+     {
+      "revid": 1328372604,
+      "parentid": 1328295647,
+      "user": "Tpbradbury",
+      "timestamp": "2025-12-19T13:48:22Z",
+      "size": 96865,
+      "comment": "/* top */ ce"
+     },
+     {
+      "revid": 1328295647,
+      "parentid": 1327967029,
+      "user": "BD2412",
+      "timestamp": "2025-12-19T01:03:06Z",
+      "size": 97138,
+      "comment": "clean up spacing around commas and other punctuation, replaced: ; → ;,  p.1 →  p. 1, , p. → , p. , , p.   → , p."
+     },
+     {
+      "revid": 1327967029,
+      "parentid": 1326756289,
+      "user": "Rainunderthebridge",
+      "timestamp": "2025-12-17T02:52:46Z",
+      "size": 97153,
+      "comment": "added links"
+     },
+     {
+      "revid": 1326756289,
+      "parentid": 1321445555,
+      "user": "Turtlens",
+      "timestamp": "2025-12-10T18:20:09Z",
+      "size": 97133,
+      "comment": ""
+     },
+     {
+      "revid": 1321445555,
+      "parentid": 1321095681,
+      "user": "Sleyece",
+      "timestamp": "2025-11-10T15:58:42Z",
+      "size": 97133,
+      "comment": "Wording"
+     },
+     {
+      "revid": 1321095681,
+      "parentid": 1320196655,
+      "user": "Nick Number",
+      "timestamp": "2025-11-08T17:31:50Z",
+      "size": 97138,
+      "comment": "/* Commemoration */ added [[Ada Byron Award]]"
+     },
+     {
+      "revid": 1320196655,
+      "parentid": 1318084040,
+      "user": "OAbot",
+      "timestamp": "2025-11-03T08:00:29Z",
+      "size": 96366,
+      "comment": "[[Wikipedia:OABOT|Open access bot]]: url-access=subscription updated in citation with #oabot."
+     },
+     {
+      "revid": 1318084040,
+      "parentid": 1314207183,
+      "user": "Joakim589",
+      "timestamp": "2025-10-21T20:49:35Z",
+      "size": 96341,
+      "comment": "/* In popular culture */"
+     },
+     {
+      "revid": 1314207183,
+      "parentid": 1312256926,
+      "user": "Lijil",
+      "timestamp": "2025-09-30T07:18:41Z",
+      "size": 96097,
+      "comment": "added note about the name Lovelace being chosen in honour of Ada's ancestors."
+     },
+     {
+      "revid": 1312256926,
+      "parentid": 1311475371,
+      "user": "JezGrove",
+      "timestamp": "2025-09-19T15:56:53Z",
+      "size": 95431,
+      "comment": "/* Death */Added missing word \"that\""
+     },
+     {
+      "revid": 1311475371,
+      "parentid": 1311474454,
+      "user": "Favonian",
+      "timestamp": "2025-09-15T10:37:11Z",
+      "size": 95426,
+      "comment": "padlock"
+     },
+     {
+      "revid": 1311474454,
+      "parentid": 1311465179,
+      "user": "Favonian",
+      "timestamp": "2025-09-15T10:31:58Z",
+      "size": 95408,
+      "comment": "Protected \"[[Ada Lovelace]]\": Persistent [[WP:Disruptive editing|disruptive editing]]: Noble experiment failed -- requested at [[WP:RFPP]] ([Edit=Require autoconfirmed or confirmed access] (indefinite) [Move=Require autoconfirmed or confirmed access] (indefinite))"
+     },
+     {
+      "revid": 1311465179,
+      "parentid": 1311465156,
+      "user": "ClueBot NG",
+      "timestamp": "2025-09-15T09:34:03Z",
+      "size": 95408,
+      "comment": "Reverting possible vandalism by [[Special:Contribs/192.0.2.63|192.0.2.63]] to version by Xxanthippe. [[WP:CBFP|Report False Positive?]] Thanks, [[WP:CBNG|ClueBot NG]]. (4420831) (Bot)"
+     },
+     {
+      "revid": 1311465156,
+      "parentid": 1311464851,
+      "user": "192.0.2.63",
+      "anon": true,
+      "timestamp": "2025-09-15T09:33:56Z",
+      "size": 95438,
+      "comment": "/* Publications */"
+     }
+    ]
+   }
+  ]
+ }
+}

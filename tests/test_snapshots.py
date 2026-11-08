@@ -5,18 +5,25 @@ Update with ``python -m pytest --snapshot-update`` after an intentional change, 
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
-from support import EASTERN, live_tab, wait_for_stream
+from rich.text import Text
+from support import EASTERN, ListSource, live_tab, wait_for_stream
 
 from wikihose.clock import VirtualClock
 from wikihose.config import Config
+from wikihose.diff import DiffHeader, parse_diff, render_diff
 from wikihose.sources.events import FeedStatus
 from wikihose.sources.recording import read_recording, sample_recording
 from wikihose.sources.replay import ReplaySource
+from wikihose.store import Store
 from wikihose.ui.app import WikihoseApp
+from wikihose.ui.tabs.diff import DiffTab
 
 Before = Callable[[Any], Awaitable[None]]
 
@@ -73,3 +80,94 @@ def test_help_screen_80x24(snap_compare: Any) -> None:
 
 def test_rate_limited_health_bar_80x24(snap_compare: Any) -> None:
     assert snap_compare(sample_app("wikihose-dark"), terminal_size=(80, 24), run_before=rate_limited)
+
+
+# --- the Watchlist and Diff tabs, on a fixed clock with no network ------------------------------------------------------
+
+
+def watch_app(*, populated: bool) -> WikihoseApp:
+    clock = VirtualClock(datetime(2026, 11, 7, 17, 0, tzinfo=UTC))
+    store = Store(":memory:")
+    if populated:
+        for page_id, wiki, title, seen, last, unseen, minutes in (
+            (974, "enwiki", "Ada Lovelace", 100, 104, 3, 40),
+            (1208, "enwiki", "Alan Turing", 200, 200, 0, 0),
+            (5, "dewiki", "Seite mit einem ziemlich langen Titel", 10, 12, 1, 600),
+            (9, "enwiki", "Deleted example", 7, 7, 0, 0),
+        ):
+            store.add_watch(wiki, page_id, title, clock.now(), seen)
+            clock.advance(1)
+            edit_at = None if not minutes else clock.now() - timedelta(minutes=minutes)
+            store.set_watch_state(
+                wiki,
+                page_id,
+                unseen=unseen,
+                last_rev_id=last,
+                last_edit_at=edit_at,
+                deleted=title.startswith("Deleted"),
+            )
+    return WikihoseApp(ListSource(clock), Config(theme="wikihose-dark"), clock=clock, tz=EASTERN, store=store)
+
+
+async def open_tab(pilot: Any, key: str) -> None:
+    await pilot.press(key)
+    await pilot.pause()
+    await pilot.wait_for_animation()  # the tab strip's underline slides to the new tab; capture it at rest
+    await pilot.pause()
+
+
+async def populated_watchlist(pilot: Any) -> None:
+    pilot.app._editors[("enwiki", 974)] = "Vitorperrut555"
+    pilot.app.watchlist._changed()
+    await open_tab(pilot, "3")
+
+
+async def empty_watchlist(pilot: Any) -> None:
+    await open_tab(pilot, "3")
+    # Nothing in the empty tab can take the focus, so where it lands after the switch (the tab strip or nowhere)
+    # depends on timing. Pin it, or the footer and the tab highlight differ from run to run.
+    pilot.app.screen.set_focus(None)
+    await pilot.pause()
+
+
+async def shown_diff(pilot: Any) -> None:
+    await open_tab(pilot, "4")
+    tab = pilot.app.query_one(DiffTab)
+    payload = json.loads((Path(__file__).parent / "fixtures" / "rest" / "compare_changed_line.json").read_text("utf-8"))
+    header = DiffHeader(
+        "Ada Lovelace", "Vitorperrut555", "Cat-a-lot: moving", datetime(2026, 11, 6, 19, 2, tzinfo=UTC), 98350, 98391
+    )
+    tab.state = "shown"
+    tab._set(render_diff(parse_diff("enwiki", 1383337217, 1384127064, payload), header, tz=EASTERN))
+    await pilot.wait_for_animation()
+    await pilot.pause()
+
+
+async def loading_diff(pilot: Any) -> None:
+    await open_tab(pilot, "4")
+    tab = pilot.app.query_one(DiffTab)
+    tab._set(Text("Loading the change…", style="dim"))
+    await pilot.pause()
+
+
+@pytest.mark.parametrize("size", [(80, 24), (120, 30)], ids=["80x24", "120x30"])
+def test_watchlist_tab_empty(snap_compare: Any, size: tuple[int, int]) -> None:
+    assert snap_compare(watch_app(populated=False), terminal_size=size, run_before=empty_watchlist)
+
+
+@pytest.mark.parametrize("size", [(80, 24), (120, 30)], ids=["80x24", "120x30"])
+def test_watchlist_tab_populated(snap_compare: Any, size: tuple[int, int]) -> None:
+    assert snap_compare(watch_app(populated=True), terminal_size=size, run_before=populated_watchlist)
+
+
+def test_diff_tab_empty_80x24(snap_compare: Any) -> None:
+    assert snap_compare(watch_app(populated=False), terminal_size=(80, 24), run_before=lambda p: open_tab(p, "4"))
+
+
+def test_diff_tab_loading_80x24(snap_compare: Any) -> None:
+    assert snap_compare(watch_app(populated=False), terminal_size=(80, 24), run_before=loading_diff)
+
+
+@pytest.mark.parametrize("size", [(80, 24), (120, 30)], ids=["80x24", "120x30"])
+def test_diff_tab_shown(snap_compare: Any, size: tuple[int, int]) -> None:
+    assert snap_compare(watch_app(populated=False), terminal_size=size, run_before=shown_diff)

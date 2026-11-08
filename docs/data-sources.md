@@ -76,6 +76,29 @@ events), `mediawiki.page_change.v1` was 57% of the bytes for data recentchange a
   timestamp, `prop=info` for page IDs). Siteinfo returned 30 namespaces and 5 aliases for enwiki; each namespace has `id`,
   `case`, `content` and the name.
 
+### Action API calls the watchlist makes
+
+Captured on 7 Nov 2026 (`tests/fixtures/actionapi/`, `tests/fixtures/rest/`). All use `format=json&formatversion=2`.
+
+- **Page ID on add:** `action=query&prop=info&titles=<title>&redirects=1`. An existing page has `pageid`, `ns`, `title`
+  and `lastrevid`. A redirect is resolved: the answer is the target page and `query.redirects` lists `{from, to}`
+  (`Augusta Ada King` gives Ada Lovelace, page 974). A missing page has `missing: true` and no `pageid`. Only `ns` 0 is
+  watched.
+- **Catch-up, step 1:** `prop=info&pageids=a|b|c` for up to 50 IDs. A deleted or unknown ID comes back as
+  `{pageid, missing: true}`, a renamed page has its new `title`, and `lastrevid` says whether anything changed.
+- **Catch-up, step 2:** `prop=revisions&pageids=<one id>&rvprop=ids|timestamp|user|comment|size&rvlimit=50&rvend=<30 days
+  ago>`, newest first, with `continue.rvcontinue` when more are left. **`rvlimit` and `rvend` cannot be used with
+  several pages**: MediaWiki answers `invalidparammix` ("may only be used on a single page"). Asking for several pages
+  without them returns only each page's newest revision. So history is one request per changed page, and the step 1
+  check keeps unchanged pages out of it. Hidden users and comments arrive as `userhidden` and `commenthidden`.
+- **Diff:** the REST compare payload has `from` and `to` (revision `id`, `slot_role`, `sections`) and `diff`, a list of
+  `{type, lineNumber, text, offset, highlightRanges?}`. `type` is 0 context, 1 added, 2 removed (removed lines can lack
+  `lineNumber`), 3 a changed line. For type 3, `text` holds the old and new words merged, and `highlightRanges` marks
+  each stretch `{start, length, type}` with type 0 added and 1 removed. **Offsets count UTF-8 bytes**, not characters:
+  after a non-ASCII character the character offsets drift (checked on a real payload). Types 4 and 5 (moved paragraphs)
+  did not occur in the payloads captured; the code accepts them. The payload has no user, comment or timestamp; those
+  come from the edit.
+
 ## Rate limits (new in 2026)
 
 From mediawiki.org, "Wikimedia APIs/Rate limits" and "Access policy":

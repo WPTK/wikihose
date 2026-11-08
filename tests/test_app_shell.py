@@ -5,9 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import respx
 from support import (
     EASTERN,
     ListSource,
+    action_api,
+    finish_work,
     footer_keys,
     footer_text,
     live_tab,
@@ -20,6 +23,7 @@ from textual.widgets import Button, DataTable, Input, Label, TabbedContent
 
 from wikihose.clock import VirtualClock
 from wikihose.config import Config, load_config
+from wikihose.net import Client
 from wikihose.sources.events import FeedStatus
 from wikihose.sources.recording import sample_recording
 from wikihose.sources.replay import ReplaySource
@@ -93,23 +97,13 @@ async def test_clicking_the_live_tab_puts_the_focus_in_it(clock: VirtualClock) -
         assert app.focused.id == "log"
 
 
-@pytest.mark.parametrize("tab", ["diff", "convergence"])
+@pytest.mark.parametrize("tab", ["convergence"])
 async def test_stub_panes_say_what_is_coming(clock: VirtualClock, tab: str) -> None:
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.click(f"Tab#--content-tab-{tab}")
         await pilot.pause()
         text = str(app.query_one(f"TabPane#{tab} StubPane").render())
-        assert "Arrives in a later version." in text
-
-
-async def test_watchlist_stub_says_how_to_add_a_page(clock: VirtualClock) -> None:
-    app = app_with(clock)
-    async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.press("3")
-        await pilot.pause()
-        text = str(app.query_one("TabPane#watchlist StubPane").render())
-        assert "Press w to add a page." in text
         assert "Arrives in a later version." in text
 
 
@@ -237,7 +231,7 @@ async def test_help_lists_the_active_keys_in_live_mode(clock: VirtualClock) -> N
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press("question_mark")
         await pilot.pause()
-        assert help_keys(app) == ["b", "a", "m", "i", "p", "w", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert help_keys(app) == ["b", "a", "m", "i", "d", "p", "w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
 
 
 async def test_help_lists_the_replay_keys_only_in_a_replay(clock: VirtualClock) -> None:
@@ -247,7 +241,7 @@ async def test_help_lists_the_replay_keys_only_in_a_replay(clock: VirtualClock) 
             await pilot.press("question_mark")
             await pilot.pause()
             assert help_keys(app) == [
-                "b", "a", "m", "i", "p", "w", "?", "q", "space", "+", "-", "]", "1-5", "Enter", "Tab", "Mouse",
+                "b", "a", "m", "i", "d", "p", "w", "W", "?", "q", "space", "+", "-", "]", "1-5", "Enter", "Tab", "Mouse",
             ]  # fmt: skip
 
 
@@ -257,7 +251,7 @@ async def test_help_on_another_tab_does_not_list_the_live_keys(clock: VirtualClo
         await pilot.press("3")
         await pilot.press("question_mark")
         await pilot.pause()
-        assert help_keys(app) == ["w", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+        assert help_keys(app) == ["w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
 
 
 @pytest.mark.parametrize("closer", ["escape", "question_mark", "button"])
@@ -373,43 +367,56 @@ async def test_footer_shows_the_replay_keys_only_in_a_replay(clock: VirtualClock
 # --- the watchlist ---------------------------------------------------------------------------------------------------
 
 
-async def test_w_on_a_log_row_adds_that_article_and_badges_the_tab(clock: VirtualClock) -> None:
-    app = app_with(clock, make_edit("Ada Lovelace"))
+@respx.mock
+async def test_w_on_a_log_row_adds_that_article(clock: VirtualClock, client: Client) -> None:
+    route = action_api((974, "Ada Lovelace", 500))
+    app = app_with(clock, make_edit("Ada Lovelace"), client=client)
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
         await pilot.press("w")
-        await pilot.pause()
+        await finish_work(app, pilot)
         assert ("enwiki", "Ada Lovelace") in app.watchlist
         assert len(app.watchlist) == 1
         assert [n.message for n in app._notifications] == ["Watching Ada Lovelace"]
-        tab = app.query_one(TabbedContent).get_tab("watchlist")
-        assert str(tab.label_text) == "Watchlist 1"
+        assert route.call_count == 1
+        # nothing is unseen yet, so the tab has no number
+        assert str(app.query_one(TabbedContent).get_tab("watchlist").label_text) == "Watchlist"
 
 
-async def test_w_on_a_top_row_adds_that_article(clock: VirtualClock) -> None:
-    app = app_with(clock, make_edit("Grace Hopper"))
+@respx.mock
+async def test_w_on_a_top_row_adds_that_article(clock: VirtualClock, client: Client) -> None:
+    action_api((12, "Grace Hopper", 500))
+    app = app_with(clock, make_edit("Grace Hopper"), client=client)
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
         app.query_one("#top").focus()
         await pilot.pause()
         await pilot.press("w")
-        await pilot.pause()
+        await finish_work(app, pilot)
         assert ("enwiki", "Grace Hopper") in app.watchlist
 
 
-async def test_w_on_the_same_page_twice_says_so_and_does_not_double_count(clock: VirtualClock) -> None:
-    app = app_with(clock, make_edit("Ada Lovelace"))
+@respx.mock
+async def test_w_on_the_same_page_twice_says_so_and_does_not_double_count(clock: VirtualClock, client: Client) -> None:
+    action_api((974, "Ada Lovelace", 500))
+    app = app_with(clock, make_edit("Ada Lovelace"), client=client)
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
-        await pilot.press("w", "w")
-        await pilot.pause()
+        await pilot.press("w")
+        await finish_work(app, pilot)
+        await pilot.press("w")
+        await finish_work(app, pilot)
         assert len(app.watchlist) == 1
         assert [n.message for n in app._notifications] == ["Watching Ada Lovelace", "Already watching Ada Lovelace"]
 
 
+@respx.mock
 @pytest.mark.parametrize("tab_key", ["1", "2", "3", "4", "5"])
-async def test_w_anywhere_else_opens_the_dialog_and_adds_what_you_type(clock: VirtualClock, tab_key: str) -> None:
-    app = app_with(clock)  # no edits, so the Live tab has no row to add either
+async def test_w_anywhere_else_opens_the_dialog_and_adds_what_you_type(
+    clock: VirtualClock, client: Client, tab_key: str
+) -> None:
+    action_api((974, "Ada Lovelace", 500))
+    app = app_with(clock, client=client)  # no edits, so the Live tab has no row to add either
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press(tab_key)
         await pilot.pause()
@@ -417,21 +424,74 @@ async def test_w_anywhere_else_opens_the_dialog_and_adds_what_you_type(clock: Vi
         await pilot.pause()
         assert isinstance(app.screen, AddPage)
         await pilot.press(*"ada lovelace", "enter")
-        await pilot.pause()
+        await finish_work(app, pilot)
         assert not isinstance(app.screen, AddPage)
-        assert ("enwiki", "Ada lovelace") in app.watchlist
-        assert str(app.query_one(TabbedContent).get_tab("watchlist").label_text) == "Watchlist 1"
+        assert ("enwiki", "Ada Lovelace") in app.watchlist
+        assert [n.message for n in app._notifications] == ["Watching Ada Lovelace"]
 
 
-async def test_the_dialog_reads_a_pasted_wikipedia_url(clock: VirtualClock) -> None:
-    app = app_with(clock)
+@respx.mock
+async def test_the_dialog_reads_a_pasted_wikipedia_url(clock: VirtualClock, client: Client) -> None:
+    route = action_api((7, "Ada Lovelace", 500))
+    app = app_with(clock, client=client)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press("2", "w")
         await pilot.pause()
         app.screen.query_one(Input).value = "https://de.wikipedia.org/wiki/Ada_Lovelace"
         await pilot.click("#add")
-        await pilot.pause()
+        await finish_work(app, pilot)
         assert ("dewiki", "Ada Lovelace") in app.watchlist
+        assert route.calls.last.request.url.host == "de.wikipedia.org"
+
+
+@respx.mock
+async def test_capital_w_opens_the_dialog_even_on_a_log_row(clock: VirtualClock, client: Client) -> None:
+    app = app_with(clock, make_edit("Ada Lovelace"), client=client)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("W")
+        await pilot.pause()
+        assert isinstance(app.screen, AddPage)
+        assert len(app.watchlist) == 0
+
+
+@respx.mock
+async def test_a_bad_title_or_link_is_explained_and_makes_no_request(clock: VirtualClock, client: Client) -> None:
+    route = action_api()
+    app = app_with(clock, client=client)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2", "w")
+        await pilot.pause()
+        await pilot.press(*"Talk:Ada", "enter")
+        await finish_work(app, pilot)
+        assert [n.message for n in app._notifications] == [
+            "Talk: pages are not articles. wikihose watches articles only."
+        ]
+        assert route.call_count == 0
+        assert len(app.watchlist) == 0
+
+
+@respx.mock
+async def test_a_missing_page_is_explained(clock: VirtualClock, client: Client) -> None:
+    action_api()
+    app = app_with(clock, client=client)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2", "w")
+        await pilot.pause()
+        await pilot.press(*"Zzzz", "enter")
+        await finish_work(app, pilot)
+        assert [n.message for n in app._notifications] == ["There is no page called \u201cZzzz\u201d."]
+        assert len(app.watchlist) == 0
+
+
+async def test_without_a_connection_adding_says_so(clock: VirtualClock) -> None:
+    app = app_with(clock, make_edit("Ada Lovelace"))  # no client, as in a replay
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        await pilot.press("w")
+        await finish_work(app, pilot)
+        assert "needs a connection to Wikipedia" in next(n.message for n in app._notifications)
+        assert len(app.watchlist) == 0
 
 
 async def test_the_dialog_cancels_with_escape_and_with_the_button(clock: VirtualClock) -> None:
@@ -469,19 +529,23 @@ async def test_the_badge_goes_away_with_no_pages(clock: VirtualClock) -> None:
         assert str(app.query_one(TabbedContent).get_tab("watchlist").label_text) == "Watchlist"
 
 
-async def test_a_watched_article_gets_the_accent_colour_in_the_log(clock: VirtualClock) -> None:
-    app = app_with(clock, make_edit("Ada Lovelace"), make_edit("Grace Hopper"))
+@respx.mock
+async def test_a_watched_article_is_marked_in_the_log(clock: VirtualClock, client: Client) -> None:
+    action_api((974, "Ada Lovelace", 500))
+    app = app_with(clock, make_edit("Ada Lovelace"), make_edit("Grace Hopper"), client=client)
     async with app.run_test(size=(100, 30)) as pilot:
         tab = await settle(app, pilot)
         app.watch_page("enwiki", "Ada Lovelace")
-        await pilot.pause()
+        await finish_work(app, pilot)
         table = app.query_one("#log", DataTable)
         by_title = {}
         for key, edit in tab._rows:
             cell = table.get_cell(key, "Article")
-            by_title[edit.title] = cell.spans[0].style if cell.spans else str(cell.style)
-        assert app.current_theme.accent in str(by_title["Ada Lovelace"])
-        assert app.current_theme.accent not in str(by_title["Grace Hopper"])
+            by_title[edit.title] = cell
+        ada, grace = by_title["Ada Lovelace"], by_title["Grace Hopper"]
+        assert ada.plain.startswith("\u2605 ")  # a star, so the mark does not rely on colour
+        assert all(app.current_theme.accent in str(span.style) for span in ada.spans)
+        assert not grace.plain.startswith("\u2605") and not grace.spans
 
 
 # --- settings --------------------------------------------------------------------------------------------------------

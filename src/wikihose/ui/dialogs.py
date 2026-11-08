@@ -1,4 +1,4 @@
-"""The small dialogs: help, add a page, change the wiki, and the detail of one edit."""
+"""The small dialogs: help, add a page, stop watching a page, change the wiki, and the detail of one edit."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class HelpScreen(ModalScreen[None]):
     HelpScreen { align: center middle; }
     HelpScreen > Vertical { width: 72; height: auto; max-height: 100%; border: round $primary; background: $surface;
         padding: 0 1; }
-    HelpScreen VerticalScroll { height: auto; }
+    HelpScreen VerticalScroll { height: auto; max-height: 70vh; }
     HelpScreen .help-line { width: 100%; }
     HelpScreen Button { margin-top: 1; }
     """
@@ -75,6 +75,32 @@ class AddPage(ModalScreen[str | None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         text = self.query_one(Input).value.strip()
         self.dismiss(text or None if event.button.id == "add" else None)
+
+
+class ConfirmRemove(ModalScreen[bool]):
+    """Asks before a page leaves the watchlist. Dismisses with True only for the Remove button."""
+
+    BINDINGS = [Binding("escape", "dismiss(False)", "Cancel", show=False)]
+    DEFAULT_CSS = """
+    ConfirmRemove { align: center middle; }
+    ConfirmRemove > Vertical { width: 64; height: auto; border: round $primary; background: $surface;
+        padding: 0 1; }
+    ConfirmRemove Horizontal { height: auto; }
+    """
+
+    def __init__(self, title: str) -> None:
+        super().__init__()
+        self.title_text = title
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label(Content.assemble("Stop watching ", (self.title_text, "bold"), "?"))
+            with Horizontal():
+                yield Button("Remove", id="remove", variant="primary")
+                yield Button("Keep", id="keep")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(event.button.id == "remove")
 
 
 class WikiPrompt(ModalScreen[str | None]):

@@ -7,6 +7,7 @@ ships in the wheel, so a broken package or a missing data file shows up here.
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 import tempfile
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -18,7 +19,7 @@ from wikihose.net import RequestBudget
 from wikihose.sources.events import Edit, FeedStatus, PageMove, parse_recentchange
 from wikihose.sources.recording import demo_recording, read_recording, sample_recording
 from wikihose.sources.replay import ReplaySource
-from wikihose.store import SCHEMA_VERSION, Store
+from wikihose.store import SCHEMA_V1, SCHEMA_VERSION, Store
 from wikihose.ui.theme import THEMES, orange_roles
 
 
@@ -41,9 +42,30 @@ def _config() -> None:
 def _store() -> None:
     store = Store(":memory:")
     try:
-        assert store.schema_version() == SCHEMA_VERSION == 1, "the database did not migrate to version 1"
+        assert store.schema_version() == SCHEMA_VERSION == 2, "the database did not migrate to version 2"
     finally:
         store.close()
+    with tempfile.TemporaryDirectory() as folder:  # a version 1 database with a watched page moves up to version 2
+        path = Path(folder) / "v1.db"
+        old = sqlite3.connect(path)
+        for statement in SCHEMA_V1:
+            old.execute(statement)
+        old.execute("INSERT INTO watchlist VALUES ('enwiki', 974, 'Ada Lovelace', '2026-11-07T12:00:00+00:00')")
+        old.execute("INSERT INTO last_seen VALUES ('enwiki', 974, 1384127064, '2026-11-07T12:00:00+00:00')")
+        old.execute("PRAGMA user_version = 1")
+        old.commit()
+        old.close()
+        upgraded = Store(path)
+        try:
+            (page,) = upgraded.watched_pages()
+            assert (page.title, page.seen_rev_id, page.last_rev_id, page.unseen) == (
+                "Ada Lovelace",
+                1384127064,
+                1384127064,
+                0,
+            )
+        finally:
+            upgraded.close()
 
 
 def _sample_counts() -> tuple[int, int]:
@@ -108,7 +130,7 @@ def _budget() -> None:
 CHECKS: list[tuple[str, Callable[[], None]]] = [
     ("themes are registered and not orange", _themes),
     ("config defaults load and round-trip", _config),
-    ("database migrates to version 1", _store),
+    ("database migrates to version 2, from version 1 too", _store),
     ("sample events parse", _parse),
     ("replay of the sample", _replay),
     ("demo recording is there", _demo),

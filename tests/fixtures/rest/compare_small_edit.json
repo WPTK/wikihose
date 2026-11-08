@@ -1,0 +1,351 @@
+{
+ "from": {
+  "id": 1383337217,
+  "slot_role": "main",
+  "sections": [
+   {
+    "level": 2,
+    "heading": "==Biography==",
+    "offset": 6607
+   },
+   {
+    "level": 3,
+    "heading": "===Childhood===",
+    "offset": 6621
+   },
+   {
+    "level": 3,
+    "heading": "===Adult years===",
+    "offset": 11566
+   },
+   {
+    "level": 3,
+    "heading": "===Education===",
+    "offset": 18308
+   },
+   {
+    "level": 3,
+    "heading": "===Death===",
+    "offset": 20885
+   },
+   {
+    "level": 2,
+    "heading": "==Work==",
+    "offset": 22838
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's lecture, Menabrea's French transcription, Lovelace's translation and Notes A-G===",
+    "offset": 26434
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's preface===",
+    "offset": 28511
+   },
+   {
+    "level": 3,
+    "heading": "===First published computer program===",
+    "offset": 29755
+   },
+   {
+    "level": 4,
+    "heading": "====Controversy over contribution====",
+    "offset": 32221
+   },
+   {
+    "level": 3,
+    "heading": "===Insight into potential of computing devices===",
+    "offset": 39305
+   },
+   {
+    "level": 3,
+    "heading": "===Distinction between mechanism and logical structure===",
+    "offset": 44778
+   },
+   {
+    "level": 2,
+    "heading": "==Commemoration<!--'Ada Lovelace Day' redirects here-->==",
+    "offset": 46645
+   },
+   {
+    "level": 3,
+    "heading": "===Bicentenary (2015)===",
+    "offset": 63228
+   },
+   {
+    "level": 2,
+    "heading": "==In popular culture==",
+    "offset": 66954
+   },
+   {
+    "level": 3,
+    "heading": "===Novels, plays and poetry===",
+    "offset": 67220
+   },
+   {
+    "level": 3,
+    "heading": "===Film and television===",
+    "offset": 72139
+   },
+   {
+    "level": 3,
+    "heading": "===Games===",
+    "offset": 75350
+   },
+   {
+    "level": 3,
+    "heading": "===Computing and STEM===",
+    "offset": 76390
+   },
+   {
+    "level": 3,
+    "heading": "===Other===",
+    "offset": 82140
+   },
+   {
+    "level": 2,
+    "heading": "==Publications==",
+    "offset": 84948
+   },
+   {
+    "level": 3,
+    "heading": "===Publication history===",
+    "offset": 86039
+   },
+   {
+    "level": 2,
+    "heading": "==See also==",
+    "offset": 87747
+   },
+   {
+    "level": 2,
+    "heading": "==Explanatory notes==",
+    "offset": 87952
+   },
+   {
+    "level": 2,
+    "heading": "==References==",
+    "offset": 87988
+   },
+   {
+    "level": 3,
+    "heading": "===Citations===",
+    "offset": 88003
+   },
+   {
+    "level": 3,
+    "heading": "===General and cited sources===",
+    "offset": 88032
+   },
+   {
+    "level": 2,
+    "heading": "==Further reading==",
+    "offset": 93114
+   },
+   {
+    "level": 2,
+    "heading": "==External links==",
+    "offset": 93784
+   }
+  ]
+ },
+ "to": {
+  "id": 1384127064,
+  "slot_role": "main",
+  "sections": [
+   {
+    "level": 2,
+    "heading": "==Biography==",
+    "offset": 6607
+   },
+   {
+    "level": 3,
+    "heading": "===Childhood===",
+    "offset": 6621
+   },
+   {
+    "level": 3,
+    "heading": "===Adult years===",
+    "offset": 11566
+   },
+   {
+    "level": 3,
+    "heading": "===Education===",
+    "offset": 18308
+   },
+   {
+    "level": 3,
+    "heading": "===Death===",
+    "offset": 20885
+   },
+   {
+    "level": 2,
+    "heading": "==Work==",
+    "offset": 22838
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's lecture, Menabrea's French transcription, Lovelace's translation and Notes A-G===",
+    "offset": 26434
+   },
+   {
+    "level": 3,
+    "heading": "===Babbage's preface===",
+    "offset": 28511
+   },
+   {
+    "level": 3,
+    "heading": "===First published computer program===",
+    "offset": 29755
+   },
+   {
+    "level": 4,
+    "heading": "====Controversy over contribution====",
+    "offset": 32221
+   },
+   {
+    "level": 3,
+    "heading": "===Insight into potential of computing devices===",
+    "offset": 39305
+   },
+   {
+    "level": 3,
+    "heading": "===Distinction between mechanism and logical structure===",
+    "offset": 44778
+   },
+   {
+    "level": 2,
+    "heading": "==Commemoration<!--'Ada Lovelace Day' redirects here-->==",
+    "offset": 46645
+   },
+   {
+    "level": 3,
+    "heading": "===Bicentenary (2015)===",
+    "offset": 63228
+   },
+   {
+    "level": 2,
+    "heading": "==In popular culture==",
+    "offset": 66954
+   },
+   {
+    "level": 3,
+    "heading": "===Novels, plays and poetry===",
+    "offset": 67220
+   },
+   {
+    "level": 3,
+    "heading": "===Film and television===",
+    "offset": 72139
+   },
+   {
+    "level": 3,
+    "heading": "===Games===",
+    "offset": 75350
+   },
+   {
+    "level": 3,
+    "heading": "===Computing and STEM===",
+    "offset": 76390
+   },
+   {
+    "level": 3,
+    "heading": "===Other===",
+    "offset": 82140
+   },
+   {
+    "level": 2,
+    "heading": "==Publications==",
+    "offset": 84948
+   },
+   {
+    "level": 3,
+    "heading": "===Publication history===",
+    "offset": 86039
+   },
+   {
+    "level": 2,
+    "heading": "==See also==",
+    "offset": 87747
+   },
+   {
+    "level": 2,
+    "heading": "==Explanatory notes==",
+    "offset": 87952
+   },
+   {
+    "level": 2,
+    "heading": "==References==",
+    "offset": 87988
+   },
+   {
+    "level": 3,
+    "heading": "===Citations===",
+    "offset": 88003
+   },
+   {
+    "level": 3,
+    "heading": "===General and cited sources===",
+    "offset": 88032
+   },
+   {
+    "level": 2,
+    "heading": "==Further reading==",
+    "offset": 93114
+   },
+   {
+    "level": 2,
+    "heading": "==External links==",
+    "offset": 93784
+   }
+  ]
+ },
+ "diff": [
+  {
+   "type": 0,
+   "lineNumber": 365,
+   "text": "[[Category:British countesses by marriage]]",
+   "offset": {
+    "from": 97631,
+    "to": 97631
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 366,
+   "text": "[[Category:British women computer scientists]]",
+   "offset": {
+    "from": 97675,
+    "to": 97675
+   }
+  },
+  {
+   "type": 1,
+   "lineNumber": 367,
+   "text": "[[Category:British computer scientists]]",
+   "offset": {
+    "from": null,
+    "to": 97722
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 368,
+   "text": "[[Category:Burials in Nottinghamshire]]",
+   "offset": {
+    "from": 97722,
+    "to": 97763
+   }
+  },
+  {
+   "type": 0,
+   "lineNumber": 369,
+   "text": "[[Category:Byron family|Ada]]",
+   "offset": {
+    "from": 97762,
+    "to": 97803
+   }
+  }
+ ]
+}

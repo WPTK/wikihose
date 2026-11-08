@@ -1,12 +1,15 @@
 """The app shell: the top bar, the tab strip, the feed-health bar, the footer and the "make the window bigger" cover.
 
 The shell does not know what is inside a tab. Tabs get the stream by subscribing to it; they tell the shell about
-changes with messages. ``w`` asks the focused widget for its page (a ``PageTable``) and otherwise opens a dialog.
+changes with messages. ``w`` asks the focused widget for its page (a ``PageTable``) and otherwise opens a dialog;
+``W`` always opens the dialog. The shell owns the watchlist: it matches every live edit and page move against it (from
+memory, no requests), runs the startup catch-up in a worker and keeps the Watchlist tab's badge.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import logging
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
@@ -20,22 +23,27 @@ from textual.screen import Screen
 from textual.widgets import Footer, Static, TabbedContent, TabPane
 from textual.widgets._tabs import Tab
 
+from wikihose.catchup import CatchUpResult, catch_up
 from wikihose.clock import Clock
 from wikihose.config import Config, load_config, save_config
-from wikihose.sources.events import FeedStatus, StreamItem
+from wikihose.net import Client
+from wikihose.sources.events import Edit, FeedStatus, PageMove, StreamItem
 from wikihose.sources.protocol import DataSource
 from wikihose.sources.replay import ReplaySource
-from wikihose.store import Store
-from wikihose.titles import page_key, title_from_url
+from wikihose.store import Store, WatchedPage
+from wikihose.titles import page_key
 from wikihose.ui.bars import HealthBar, TopBar
 from wikihose.ui.bindings import declared_bindings, help_text, key_label
 from wikihose.ui.dialogs import FIXED_HELP, AddPage, HelpScreen
+from wikihose.ui.tabs.diff import DiffTab, OpenDiff
 from wikihose.ui.tabs.live import LiveTab
 from wikihose.ui.tabs.reading import Factory, ReadingTab
 from wikihose.ui.tabs.stub import STUBS, StubPane
+from wikihose.ui.tabs.watchlist import WatchlistTab
 from wikihose.ui.theme import THEMES
 from wikihose.ui.widgets import PageTable
-from wikihose.watchlist import Watchlist
+from wikihose.watchlist import WatchError, Watchlist
+from wikihose.watchlist_input import WatchInputError, parse_watch_input
 
 if TYPE_CHECKING:
     from textual.dom import DOMNode
@@ -43,6 +51,7 @@ if TYPE_CHECKING:
 FLOOR = (80, 24)
 TABS = ("live", "reading", "watchlist", "diff", "convergence")
 REPLAY_FINISHED = "replay finished"
+log = logging.getLogger(__name__)
 
 
 class TooSmall(Static):
@@ -82,21 +91,26 @@ class MainScreen(Screen[None]):
                 yield LiveTab(shell.config, shell.clock, shell.tz, shell.store, shell.watchlist, shell.subscribe)
             with TabPane("Reading", id="reading"):
                 yield ReadingTab(shell.reading, shell.wiki)
-            for tab_id, (label, text) in STUBS.items():
-                with TabPane(label, id=tab_id):
-                    yield StubPane(text)
+            with TabPane("Watchlist", id="watchlist"):
+                yield WatchlistTab(shell.watchlist, shell.tz, shell.last_editor)
+            with TabPane("Diff", id="diff"):
+                yield DiffTab(shell.client, shell.watchlist, shell.tz)
+            with TabPane("Convergence", id="convergence"):
+                yield StubPane(STUBS["convergence"][1])
         yield HealthBar()
         yield Footer(show_command_palette=False, compact=True)
         yield TooSmall()
 
     def on_mount(self) -> None:
         self._check_size(self.size.width, self.size.height)
+        self.shell.show_unseen()  # the number saved from last time
 
     def on_screen_resume(self) -> None:
         """Start the stream once every tab exists and has subscribed to it."""
         if not self._started:
             self._started = True
             self.shell.start_stream()
+            self.shell.start_catch_up()
 
     def on_resize(self, event: events.Resize) -> None:
         self._check_size(event.size.width, event.size.height)
@@ -136,8 +150,18 @@ class MainScreen(Screen[None]):
     def set_wiki(self, wiki: str) -> None:
         self.query_one(TopBar).set_wiki(wiki)
 
+    def set_note(self, text: str) -> None:
+        self.query_one(HealthBar).set_note(text)
+
     def refresh_top_bar(self) -> None:
         self.query_one(TopBar).refresh_text()
+
+    def start_over(self) -> None:
+        """A looping replay began again: the Live tab's numbers start from zero."""
+        self.query_one(LiveTab).start_over()  # not the app's query_one: a dialog may be the active screen
+
+    def set_reading_wiki(self, wiki: str) -> None:
+        self.query_one(ReadingTab).set_wiki(wiki)
 
 
 class WikihoseApp(App[None]):
@@ -149,7 +173,8 @@ class WikihoseApp(App[None]):
         Binding("3", "tab('watchlist')", "Watchlist", show=False),
         Binding("4", "tab('diff')", "Diff", show=False),
         Binding("5", "tab('convergence')", "Convergence", show=False),
-        Binding("w", "watch", "Watch", tooltip="Watch the selected page, or type a title or URL"),
+        Binding("w", "watch", "Watch", tooltip="Watch the selected page (W: type a title or link)"),
+        Binding("W", "watch_typed", "Type page", show=False, tooltip="Type a page title or paste a link to watch"),
         Binding("question_mark", "help", "Help", key_display="?", tooltip="Show this list of keys"),
         Binding("q", "quit", "Quit", tooltip="Quit wikihose"),
         # Replay keys: only active when the source is a replay (see check_action).
@@ -174,8 +199,10 @@ class WikihoseApp(App[None]):
         tz: tzinfo | None = None,
         store: Store | None = None,
         config_path: Path | None = None,
+        client: Client | None = None,
         reading: Factory | None = None,
         loop_replay: bool = False,
+        saved_watchlist: Sequence[WatchedPage] = (),
     ) -> None:
         super().__init__()
         self.source = source
@@ -186,7 +213,28 @@ class WikihoseApp(App[None]):
         self.reading: Factory = reading or (lambda _wiki: None)  # wiki -> Reading data; None in a replay
         self.config_path = config_path  # None: never write the config (--no-config)
         self.wiki = config.wiki
-        self.watchlist = Watchlist()
+        self.client = client  # None in a replay: no network, so nothing to add and no catch-up
+        # Without a database (a replay) the watchlist lives in memory for this run only.
+        # A replay still matches live edits against the reader's saved list: it gets a read-only copy of the rows.
+        self._scratch: Store | None = None
+        backing = store
+        if backing is None:
+            backing = self._scratch = Store(":memory:")
+            for saved in saved_watchlist:
+                backing.add_watch(saved.wiki, saved.page_id, saved.title, saved.added_at, saved.seen_rev_id)
+                backing.set_watch_state(
+                    saved.wiki,
+                    saved.page_id,
+                    unseen=saved.unseen,
+                    last_rev_id=saved.last_rev_id,
+                    last_edit_at=saved.last_edit_at,
+                    deleted=saved.deleted,
+                )
+        self.watchlist = Watchlist(backing, client, clock)
+        self._editors: dict[tuple[str, int], str] = {}  # last editor seen this run, by (wiki, page ID)
+        self._badge_queued = False
+        self._tab = "live"
+        self._previous_tab = "live"
         self.replay_finished = False
         self.loop_replay = loop_replay  # the demo: start the replay over when it ends, with an empty log
         self._subscribers: list[Callable[[StreamItem], None]] = []
@@ -198,6 +246,15 @@ class WikihoseApp(App[None]):
 
     # --- screens and data flow ---------------------------------------------------------------------------------------
 
+    def _on_main(self, method: Callable[..., None], *args: Any) -> None:
+        """Run a MainScreen method on the screen's own message loop.
+
+        The stream and catch-up workers and the app's own handlers run outside that loop. Calling the screen's methods
+        from them can query widgets Textual has already removed while it shuts down (``NoMatches``). ``post_message``
+        returns False once the screen is closing, so a callback queued here only runs while its widgets still exist.
+        """
+        self._main.call_later(method, *args)
+
     def get_default_screen(self) -> Screen[Any]:
         return self._main
 
@@ -206,6 +263,8 @@ class WikihoseApp(App[None]):
 
     async def on_unmount(self) -> None:
         await self.source.aclose()
+        if self._scratch is not None:
+            self._scratch.close()
 
     def subscribe(self, callback: Callable[[StreamItem], None]) -> None:
         """Tabs call this to receive every item of the stream, in order, on the app's own event loop."""
@@ -219,18 +278,22 @@ class WikihoseApp(App[None]):
                 return
             if not self.source.rewind():
                 return  # closed while it played
-            self._main.query_one(LiveTab).start_over()  # not self.query_one: a dialog may be the active screen
-            self._main.refresh_top_bar()
+            self._on_main(self._main.start_over)
+            self._on_main(self._main.refresh_top_bar)
 
     def _dispatch(self, item: StreamItem) -> None:
         if isinstance(item, FeedStatus):
             if isinstance(self.source, ReplaySource) and item.state == "down" and item.detail == REPLAY_FINISHED:
                 if not self.loop_replay:
                     self.replay_finished = True  # the end of a recording is not a failure
-                    self._main.refresh_top_bar()
+                    self._on_main(self._main.refresh_top_bar)
             else:
-                self._main.handle_status(item)
+                self._on_main(self._main.handle_status, item)
             return
+        if isinstance(item, Edit):
+            self._watch_edit(item)
+        elif isinstance(item, PageMove):
+            self._watch_move(item)
         for callback in list(self._subscribers):
             callback(item)
 
@@ -240,8 +303,96 @@ class WikihoseApp(App[None]):
         self.query_one(TabbedContent).active = tab_id
         self.call_after_refresh(self._main.focus_active_pane)
 
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        tab = event.pane.id or "live"
+        if tab != self._tab:
+            self._previous_tab, self._tab = self._tab, tab
+
+    def on_diff_tab_back(self) -> None:
+        self.action_tab(self._previous_tab if self._previous_tab != "diff" else "live")
+
+    def on_open_diff(self, message: OpenDiff) -> None:
+        self.action_tab("diff")
+        self.query_one(DiffTab).show(message.request)
+
     def _watchlist_changed(self) -> None:
-        self._main.set_badge(len(self.watchlist))
+        self.show_unseen()
+
+    def show_unseen(self) -> None:
+        """Update the badge. Changes that arrive together (a catch-up, page by page) draw it once."""
+        if self._badge_queued:
+            return
+        self._badge_queued = True
+        self._on_main(self._draw_badge)
+
+    def _draw_badge(self) -> None:
+        try:
+            self._main.set_badge(self.watchlist.unseen_total())
+        finally:
+            self._badge_queued = False
+
+    # --- live matching: memory only, never a request -----------------------------------------------------------------
+
+    def _watch_edit(self, edit: Edit) -> None:
+        page = self.watchlist.record_edit(edit)
+        if page is not None:
+            self._editors[(page.wiki, page.page_id)] = edit.user
+
+    def _watch_move(self, move: PageMove) -> None:
+        page = self.watchlist.apply_move(move.wiki, move.title, move.target)
+        if page is not None:
+            self.notify(f"{move.title} was moved to {page.title}. Still watching it.", timeout=5, markup=False)
+
+    def last_editor(self, page: WatchedPage) -> str:
+        return self._editors.get((page.wiki, page.page_id), "")
+
+    # --- the startup catch-up ----------------------------------------------------------------------------------------
+
+    def start_catch_up(self) -> None:
+        """Check the watched pages in the background. Not in a replay, which has no network."""
+        if self.client is None or isinstance(self.source, ReplaySource) or not len(self.watchlist):
+            return
+        self.run_worker(self._catch_up(self.client), name="catch-up", group="catch-up", exclusive=True)
+
+    async def _catch_up(self, client: Client) -> None:
+        total = len(self.watchlist)
+        what = f"{total} watched page" + ("" if total == 1 else "s")
+        self._on_main(self._main.set_note, f"Checking {what}…")
+        try:
+            result = await catch_up(
+                self.watchlist,
+                client,
+                self.clock,
+                lambda done, of: self._on_main(self._main.set_note, f"Checking {what}… {done} of {of}"),
+            )
+        except Exception:  # a bug here must cost the catch-up, not the app
+            log.exception("the startup catch-up failed")
+            self.notify("Could not check your watched pages.", severity="warning", timeout=6, markup=False)
+            return
+        finally:
+            self._on_main(self._main.set_note, "")
+        self._report_catch_up(what, result)
+
+    def _report_catch_up(self, what: str, result: CatchUpResult) -> None:
+        for edit in result.edits:  # newest first within a page; an editor seen live this run is newer still
+            self._editors.setdefault((edit.wiki, edit.page_id), edit.user)
+        changed = len({(edit.wiki, edit.page_id) for edit in result.edits})
+        if changed:
+            text = f"{changed} of {what} changed while you were away."
+        elif result.errors:
+            text = ""
+        else:
+            text = f"Checked {what}. Nothing new."
+        if text:
+            self.notify(text, timeout=5, markup=False)
+        for old, page in result.renamed:
+            self.notify(f"{old} is now called {page.title}.", timeout=6, markup=False)
+        for page in result.deleted:
+            self.notify(
+                f"{page.title} was deleted. It stays on your list until you remove it.", timeout=6, markup=False
+            )
+        if result.errors:
+            self.notify(f"Could not check every page. {result.errors[0]}", severity="warning", timeout=8, markup=False)
 
     # --- watching a page ---------------------------------------------------------------------------------------------
 
@@ -252,20 +403,43 @@ class WikihoseApp(App[None]):
             if page is not None:
                 self.watch_page(*page)
                 return
+        self.action_watch_typed()
+
+    def action_watch_typed(self) -> None:
         self.push_screen(AddPage(), self._page_typed)
 
     def _page_typed(self, text: str | None) -> None:
         if not text:
             return
-        parsed = title_from_url(text)
-        self.watch_page(*(parsed or (self.wiki, text)))
+        try:
+            target = parse_watch_input(text, self.wiki)
+        except WatchInputError as exc:
+            self.notify(str(exc), severity="warning", timeout=6, markup=False)
+            return
+        self.watch_page(target.wiki, target.title)
 
     def watch_page(self, wiki: str, title: str) -> None:
+        """Add a page in the background (it asks the wiki for the page ID) and say what happened in plain words."""
+        self.run_worker(self._watch(wiki, title), name="watch", group="watch")
+
+    async def _watch(self, wiki: str, title: str) -> None:
         shown = page_key(wiki, title)[1]
-        if self.watchlist.add(wiki, title):
-            self.notify(f"Watching {shown}", timeout=3, markup=False)
+        try:
+            result = await self.watchlist.add(wiki, title)
+        except WatchError as exc:
+            self.notify(str(exc), severity="warning", timeout=6, markup=False)
+            return
+        except Exception:  # an odd answer or a database error must cost this add, not the app
+            log.exception("adding a page failed")
+            self.notify(f"Could not watch {shown}. Try again later.", severity="warning", timeout=6, markup=False)
+            return
+        name = result.page.title
+        if result.already_watched:
+            self.notify(f"Already watching {name}", timeout=3, markup=False)
+        elif result.redirected_from and result.redirected_from.casefold() != name.casefold():  # not mere capitals
+            self.notify(f"{shown} redirects to {name}. Watching {name}.", timeout=5, markup=False)
         else:
-            self.notify(f"Already watching {shown}", timeout=3, markup=False)
+            self.notify(f"Watching {name}", timeout=3, markup=False)
 
     # --- help --------------------------------------------------------------------------------------------------------
 
@@ -310,22 +484,22 @@ class WikihoseApp(App[None]):
                 replay.resume()
             else:
                 replay.pause()
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     def action_replay_faster(self) -> None:
         if (replay := self._replay()) is not None:
             replay.speed = replay.speed * 2
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     def action_replay_slower(self) -> None:
         if (replay := self._replay()) is not None:
             replay.speed = replay.speed / 2
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     def action_replay_skip(self) -> None:
         if (replay := self._replay()) is not None:
             replay.skip(60)
-            self._main.refresh_top_bar()
+            self._on_main(self._main.refresh_top_bar)
 
     # --- messages from the tabs --------------------------------------------------------------------------------------
 
@@ -336,8 +510,8 @@ class WikihoseApp(App[None]):
 
     def on_live_tab_wiki_changed(self, message: LiveTab.WikiChanged) -> None:
         self.wiki = message.wiki
-        self._main.set_wiki(message.wiki)
-        self._main.query_one(ReadingTab).set_wiki(message.wiki)
+        self._on_main(self._main.set_wiki, message.wiki)
+        self._on_main(self._main.set_reading_wiki, message.wiki)
         self.update_config(wiki=message.wiki)
 
     def update_config(self, **changes: Any) -> None:

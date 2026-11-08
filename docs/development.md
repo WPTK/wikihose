@@ -36,7 +36,7 @@ Drop `--check` from `ruff format` to rewrite files. Ruff uses a 120 column limit
 function in `src/`. Vulture only reports unused code it is nearly certain about, so a report means a real leftover. Its
 paths are set in `pyproject.toml`, so it needs no arguments.
 
-`--selftest` checks the install without the network (themes, config defaults, the database migration, the bundled sample
+`--selftest` checks the install without the network (themes, config defaults, the database migration from version 1 to 2, the bundled sample
 and demo recordings and the request budget) and prints `selftest: ok`. It exits 1 and prints `selftest: FAILED (n)` otherwise.
 
 `--replay FILE --headless-seconds N` (or `--demo`, the bundled six-minute recording) plays a recording with no screen
@@ -66,15 +66,20 @@ src/wikihose/
   cli.py        argument parsing (build_parser) and the entry point: --wiki, --replay, --demo, --record, --headless-seconds
   headless.py   run_headless: feeds LiveStats from a source with no screen
   live_stats.py edits per minute, the 60-bucket series, the most edited, the people/bots split
-  watchlist.py  the in-memory watchlist
   selftest.py   the checks behind --selftest
   clock.py      the injectable Clock: SystemClock, VirtualClock (the only place that sleeps)
   paths.py      config, data, log and cache directories, with env overrides
   config.py     the Config dataclass, load_config (warns, never raises) and save_config
   net.py        the shared HTTP client: User-Agent, request budget, retries, disk cache, event stream
   sse.py        the server-sent events parser
-  titles.py     title normalization and article URL parsing
-  store.py      SQLite storage with versioned migrations
+  titles.py     title normalization, article URL parsing and host_for_wiki (enwiki to en.wikipedia.org)
+  messages.py   plain-words text for a FetchError
+  store.py      SQLite storage with versioned migrations (schema version 2: the watchlist columns)
+  watchlist_input.py  reading what the user types after w: a title or a pasted article URL
+  watchlist.py  the Watchlist service: add by page ID, in-memory match by (wiki, title), moves, unseen counts, and
+                subscribe/in/len for the tabs that redraw when it changes
+  catchup.py    startup catch-up of the watched pages through the Action API
+  diff.py       the REST compare payload as data, and render_diff for a Rich Text
   sources/      one DataSource interface, two sources
     events.py     Edit, PageMove, FeedStatus and parse_recentchange
     protocol.py   the DataSource protocol
@@ -84,12 +89,13 @@ src/wikihose/
   data/         package data: sample.jsonl.gz (used by tests and --selftest) and demo-enwiki.jsonl.gz (--demo)
   ui/           the app and its parts
     app.py        WikihoseApp and MainScreen: top bar, tab strip, health bar, footer, too-small cover
-    bars.py       TopBar and HealthBar
+    bars.py       TopBar and HealthBar (which also carries the catch-up progress line)
     bindings.py   declared_bindings: our own bindings, for the help screen and the inventory test
-    dialogs.py    help, add a page, change wiki, edit detail
+    dialogs.py    help, add a page, stop watching a page, change wiki, edit detail
     widgets.py    PageTable, a table that can say which page the cursor is on
     theme.py      the themes
-    tabs/         live.py (the Live tab) and stub.py (the other four, until they are built)
+    tabs/         live.py (Live), watchlist.py (Watchlist), diff.py (Diff and the OpenDiff message that asks for
+                  one) and stub.py (Reading and Convergence, until they are built)
 ```
 
 ## Tests

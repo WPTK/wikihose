@@ -184,9 +184,9 @@ def test_title_from_url_rejects_other_text(text: str) -> None:
 # --- store -----------------------------------------------------------------------------------------------------------
 
 
-def test_store_migrates_an_empty_database_to_v1() -> None:
+def test_store_migrates_an_empty_database_to_v2() -> None:
     store = Store(":memory:")
-    assert store.schema_version() == SCHEMA_VERSION == 1
+    assert store.schema_version() == SCHEMA_VERSION == 2
     store.close()
 
 
@@ -196,12 +196,12 @@ def test_store_reopen_is_idempotent_and_keeps_data(tmp_path: Path) -> None:
     first.add_edit_minute("enwiki", "Ada Lovelace", "2026-11-07T12:00", human_edits=1)
     first.close()
     second = Store(path)
-    assert second.schema_version() == 1
+    assert second.schema_version() == 2
     assert second.edit_minute("enwiki", "Ada Lovelace", "2026-11-07T12:00") == (1, 1, 0, 0)
     second.close()
 
 
-def test_store_has_the_v1_tables() -> None:
+def test_store_has_the_tables() -> None:
     store = Store(":memory:")
     tables = {r[0] for r in store._db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert tables == {"pageviews", "baselines", "watchlist", "last_seen", "edit_minutes"}

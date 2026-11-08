@@ -8,12 +8,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from support import ListSource, live_tab, make_app, make_edit, settle, wait_for_stream
+import respx
+from support import ListSource, action_api, finish_work, live_tab, make_app, make_edit, settle, wait_for_stream
 from textual.widgets import DataTable
 
 from wikihose.cli import main
 from wikihose.clock import VirtualClock
 from wikihose.config import Config, is_valid_wiki
+from wikihose.net import Client
 from wikihose.sources.events import Edit, clean_text, parse_recentchange
 from wikihose.sources.replay import ReplaySource
 from wikihose.store import Store
@@ -167,14 +169,15 @@ async def test_a_replayed_edit_with_an_escape_code_renders_without_it(clock: Vir
 
 
 @pytest.mark.parametrize("title", ["Foo [/]", "[@click=app.quit]x", "[bold]b"])
-async def test_toasts_show_a_title_as_plain_text(clock: VirtualClock, title: str) -> None:
-    app = make_app(ListSource(clock, []), clock)
+@respx.mock
+async def test_toasts_show_a_title_as_plain_text(clock: VirtualClock, client: Client, title: str) -> None:
+    app = make_app(ListSource(clock, []), clock, client=client)
     async with app.run_test(size=(100, 30)) as pilot:
+        action_api()  # the wiki has no such page
         app.watch_page("enwiki", title)
-        app.watch_page("enwiki", title)
-        await pilot.pause()
+        await finish_work(app, pilot)
         notes = list(app._notifications)
-        assert len(notes) == 2
+        assert len(notes) == 1
         assert all(note.markup is False for note in notes)
         assert title in notes[0].message
         assert app.is_running

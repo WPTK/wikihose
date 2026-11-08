@@ -23,8 +23,10 @@ import wikihose.ui
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.bindings import declared_bindings, key_label
 from wikihose.ui.dialogs import FIXED_HELP
+from wikihose.ui.tabs.diff import DiffTab
 from wikihose.ui.tabs.live import LiveTab
 from wikihose.ui.tabs.reading import ReadingTab
+from wikihose.ui.tabs.watchlist import WatchlistTab
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -35,7 +37,8 @@ INVENTORY: dict[str, str] = {
     "binding:WikihoseApp:3:tab('watchlist')": "test_number_keys_switch_tabs",
     "binding:WikihoseApp:4:tab('diff')": "test_number_keys_switch_tabs",
     "binding:WikihoseApp:5:tab('convergence')": "test_number_keys_switch_tabs",
-    "binding:WikihoseApp:w:watch": "test_w_on_a_log_row_adds_that_article_and_badges_the_tab",
+    "binding:WikihoseApp:w:watch": "test_w_on_a_log_row_adds_that_article",
+    "binding:WikihoseApp:W:watch_typed": "test_capital_w_opens_the_dialog_even_on_a_log_row",
     "binding:WikihoseApp:question_mark:help": "test_help_lists_the_active_keys_in_live_mode",
     "binding:WikihoseApp:q:quit": "test_q_quits_and_closes_the_source",
     "binding:WikihoseApp:space:replay_pause": "test_replay_keys_pause_speed_and_skip",
@@ -47,6 +50,13 @@ INVENTORY: dict[str, str] = {
     "binding:LiveTab:m:cycle_size": "test_size_key_cycles_through_the_steps",
     "binding:LiveTab:i:change_wiki": "test_i_switches_wiki_and_starts_the_numbers_over",
     "binding:LiveTab:p:toggle_pause": "test_pause_holds_the_log_while_the_numbers_keep_counting",
+    "binding:LiveTab:d:show_diff": "test_d_on_a_live_edit_shows_its_diff_and_b_goes_back",
+    "binding:WatchlistTab:m:mark_seen": "test_m_marks_the_selected_page_seen",
+    "binding:WatchlistTab:d:remove": "test_d_and_delete_remove_a_page_after_a_question",
+    "binding:WatchlistTab:delete:remove": "test_d_and_delete_remove_a_page_after_a_question",
+    "binding:DiffTab:escape:back": "test_escape_leaves_the_diff_for_the_tab_it_came_from",
+    "binding:DiffTab:b:back": "test_d_on_a_live_edit_shows_its_diff_and_b_goes_back",
+    "binding:ConfirmRemove:escape:dismiss(False)": "test_the_remove_question_can_be_cancelled",
     "binding:ReadingTab:r:refresh": "test_r_fetches_again",
     "binding:ReadingTab:n:more_rows": "test_n_cycles_through_25_50_and_100_rows",
     "binding:HelpScreen:escape:dismiss": "test_help_closes",
@@ -59,12 +69,16 @@ INVENTORY: dict[str, str] = {
     "footer:live:Articles": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Size": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Wiki": "test_clicking_each_live_footer_key_does_what_its_key_does",
+    "footer:live:Diff": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
+    "footer:watchlist:Seen": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
+    "footer:watchlist:Remove": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
+    "footer:diff:Back": "test_clicking_the_footer_keys_of_the_live_diff_watchlist_and_diff_tabs",
     "footer:live:Pause": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Watch": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Help": "test_clicking_each_live_footer_key_does_what_its_key_does",
     "footer:live:Quit": "test_clicking_each_live_footer_key_does_what_its_key_does",
-    "footer:live:Refresh": "test_footer_keys_refresh_and_rows_work_when_clicked",
-    "footer:live:Rows": "test_footer_keys_refresh_and_rows_work_when_clicked",
+    "footer:reading:Refresh": "test_footer_keys_refresh_and_rows_work_when_clicked",
+    "footer:reading:Rows": "test_footer_keys_refresh_and_rows_work_when_clicked",
     "footer:replay:Play": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     "footer:replay:Faster": "test_clicking_each_replay_footer_key_does_what_its_key_does",
     "footer:replay:Slower": "test_clicking_each_replay_footer_key_does_what_its_key_does",
@@ -75,6 +89,10 @@ INVENTORY: dict[str, str] = {
     "help:m": "test_help_lists_the_active_keys_in_live_mode",
     "help:i": "test_help_lists_the_active_keys_in_live_mode",
     "help:p": "test_help_lists_the_active_keys_in_live_mode",
+    "help:d": "test_help_lists_the_active_keys_in_live_mode",
+    "help:W": "test_help_lists_the_active_keys_in_live_mode",
+    "help:delete": "test_help_on_the_watchlist_and_diff_tabs_lists_their_keys",
+    "help:escape": "test_help_on_the_watchlist_and_diff_tabs_lists_their_keys",
     "help:r": "test_help_on_the_reading_tab_lists_its_keys",
     "help:n": "test_help_on_the_reading_tab_lists_its_keys",
     "help:w": "test_help_lists_the_active_keys_in_live_mode",
@@ -122,14 +140,20 @@ def collected() -> dict[str, list[str]]:
     for cls in _ui_classes():
         for binding in _own_bindings(cls):
             found[f"binding:{cls.__name__}:{binding.key}:{binding.action}"] = _key_words(binding)
-    for cls in (WikihoseApp, LiveTab, ReadingTab):
+    for cls, tab in (
+        (WikihoseApp, "live"),
+        (LiveTab, "live"),
+        (ReadingTab, "reading"),
+        (WatchlistTab, "watchlist"),
+        (DiffTab, "diff"),
+    ):
         for binding in declared_bindings(cls):
             if binding.show:
-                mode = "replay" if binding.action.startswith("replay_") else "live"
+                mode = "replay" if binding.action.startswith("replay_") else tab
                 found[f"footer:{mode}:{binding.description}"] = [_quoted(binding.description)]
             if not binding.action.startswith("tab("):
                 text = re.escape(binding.tooltip or binding.description)
-                found[f"help:{key_label(binding)}"] = [*_key_words(binding), text]
+                found.setdefault(f"help:{key_label(binding)}", []).extend([*_key_words(binding), text])
     for key, text in FIXED_HELP:
         found[f"help:{key}"] = [CLICKS] if key == "Mouse" else [_quoted(key), _quoted(key.lower()), re.escape(text)]
     for path in (ROOT / "src" / "wikihose").rglob("*.py"):

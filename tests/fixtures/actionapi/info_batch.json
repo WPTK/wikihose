@@ -1,0 +1,35 @@
+{
+ "batchcomplete": true,
+ "query": {
+  "pages": [
+   {
+    "pageid": 2,
+    "missing": true
+   },
+   {
+    "pageid": 974,
+    "ns": 0,
+    "title": "Ada Lovelace",
+    "contentmodel": "wikitext",
+    "pagelanguage": "en",
+    "pagelanguagehtmlcode": "en",
+    "pagelanguagedir": "ltr",
+    "touched": "2026-11-08T01:33:04Z",
+    "lastrevid": 1384127064,
+    "length": 98391
+   },
+   {
+    "pageid": 1208,
+    "ns": 0,
+    "title": "Alan Turing",
+    "contentmodel": "wikitext",
+    "pagelanguage": "en",
+    "pagelanguagehtmlcode": "en",
+    "pagelanguagedir": "ltr",
+    "touched": "2026-11-08T01:33:04Z",
+    "lastrevid": 1383889451,
+    "length": 175898
+   }
+  ]
+ }
+}

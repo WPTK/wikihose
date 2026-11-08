@@ -7,6 +7,10 @@ from datetime import UTC, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import httpx
+import respx
+from payloads import action_page, action_response
+
 from wikihose.clock import Clock
 from wikihose.config import Config
 from wikihose.sources.events import Edit, StreamItem
@@ -114,3 +118,24 @@ async def footer_keys(pilot: Any, app: WikihoseApp, *, needing: str | None = Non
 
 def footer_text(keys: list[Any]) -> str:
     return " ".join(str(k.render()) for k in keys)
+
+
+def action_api(*pages: tuple[int, str, int]) -> respx.Route:
+    """Answer Action API page lookups (adding a page) for any Wikipedia from ``(page ID, title, newest revision)``.
+
+    A title that differs only in case or underscores comes back under the real title, as the wiki normalizes it.
+    """
+    known = {title.lower(): action_page(page_id, title, rev) for page_id, title, rev in pages}
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked = request.url.params["titles"].replace("_", " ")
+        found = known.get(asked.lower(), {"ns": 0, "title": asked, "missing": True})
+        return action_response(found)
+
+    return respx.get(url__regex=r"https://[a-z-]+\.wikipedia\.org/w/api\.php").mock(side_effect=answer)
+
+
+async def finish_work(app: WikihoseApp, pilot: Any) -> None:
+    """Wait for the app's background workers (adding a page, the catch-up, a diff) and let the screen settle."""
+    await app.workers.wait_for_complete()
+    await pilot.pause()

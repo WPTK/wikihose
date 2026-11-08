@@ -20,11 +20,13 @@ from textual.widgets import DataTable, Sparkline, Static
 
 from wikihose.clock import Clock
 from wikihose.config import Config
+from wikihose.diff import DiffHeader
 from wikihose.live_stats import LiveStats
 from wikihose.sources.events import Edit, StreamItem
 from wikihose.store import Store
-from wikihose.titles import page_key
+from wikihose.titles import article_url, page_key
 from wikihose.ui.dialogs import EditDetail, WikiPrompt
+from wikihose.ui.tabs.diff import DiffRequest, OpenDiff
 from wikihose.ui.widgets import PageTable
 from wikihose.watchlist import Watchlist
 
@@ -118,6 +120,7 @@ class LiveTab(Vertical):
         Binding("a", "toggle_articles", "Articles", tooltip="Show only articles, or every kind of page"),
         Binding("m", "cycle_size", "Size", tooltip="Cycle the smallest change shown: any, 100, 1,000 bytes"),
         Binding("i", "change_wiki", "Wiki", tooltip="Type another wiki to watch, such as dewiki"),
+        Binding("d", "show_diff", "Diff", tooltip="Show what the selected edit changed"),
         Binding("p", "toggle_pause", "Pause", tooltip="Pause or resume the log (the numbers keep counting)"),
     ]
 
@@ -180,7 +183,7 @@ class LiveTab(Vertical):
 
     def on_mount(self) -> None:
         self._subscribe(self.accept)
-        self._watchlist.subscribe(self._watchlist_changed)
+        self._watchlist.subscribe_members(self._watchlist_changed)
         top = self.query_one("#top", PageTable)
         top.add_column("Edits", width=TOP_EDITS_WIDTH, key="Edits")
         top.add_column("Article", width=TOP_TITLE_WIDTH, key="Article")
@@ -321,11 +324,13 @@ class LiveTab(Vertical):
             bytes_style = "dim"
         watched = (edit.wiki, edit.title) in self._watchlist
         title = Text(no_wrap=True)
+        if watched:
+            title.append("★ ", style=f"bold {theme.accent}" if theme.accent else "bold")  # a mark that needs no colour
         if edit.bot:
             title.append("bot ", style="dim")
         if edit.kind == "new":
             title.append("new ", style="bold")
-        title.append(edit.title, style=theme.accent if watched else dim)
+        title.append(edit.title, style=f"bold {theme.accent}" if watched and theme.accent else dim)
         title.truncate(widths["Article"], overflow="ellipsis")
         cells = [
             Text(edit.at.astimezone(self._tz).strftime("%H:%M:%S"), style="dim"),
@@ -343,6 +348,13 @@ class LiveTab(Vertical):
         return cells
 
     def _watchlist_changed(self) -> None:
+        """A page was added or removed or renamed: redraw the log for the stars. Counts changing does not come here.
+        Runs on the tab's own message loop, never from a worker."""
+        self.call_later(self._restar)
+
+    def _restar(self) -> None:
+        if not self.is_mounted:
+            return
         self._cells.clear()
         self._draw_log()
         self.refresh_side()
@@ -480,6 +492,37 @@ class LiveTab(Vertical):
         self._draw_filters()
         self._draw_log()
         self.refresh_side()
+
+    # --- the diff of an edit -----------------------------------------------------------------------------------------
+
+    def action_show_diff(self) -> None:
+        """Open the Diff tab on the selected edit, when the event carries both revision numbers."""
+        edit = self._edit_under_cursor()
+        if edit is None:
+            return
+        if edit.kind == "new":
+            self.app.notify("That edit created the page, so there is nothing to compare it with.", timeout=4)
+        elif not edit.rev_old or edit.rev_new is None:
+            self.app.notify("That edit did not say which revision it made, so it cannot be compared.", timeout=4)
+        else:
+            header = DiffHeader(
+                edit.title,
+                edit.user,
+                edit.comment,
+                edit.at,
+                edit.old_len,
+                edit.new_len,
+                article_url(edit.server_name, edit.title),
+            )
+            self.post_message(OpenDiff(DiffRequest(edit.wiki, edit.rev_old, edit.rev_new, header)))
+
+    def _edit_under_cursor(self) -> Edit | None:
+        focused = self.app.focused
+        table = self.query_one("#top" if focused is not None and focused.id == "top" else "#log", PageTable)
+        key = table.cursor_key()
+        if key is None:
+            return None
+        return self._stats.latest(key) if table.id == "top" else self._edits.get(key)
 
     # --- opening a row -----------------------------------------------------------------------------------------------
 
