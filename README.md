@@ -22,7 +22,8 @@ where the two overlap, and edits to the pages you choose to track.
 - **Convergence:** articles hot in both: edited by people in the last 15 minutes and read at least twice their usual.
   An article that suddenly gets 10 edits has its own reading history fetched.
 
-`?` lists every key. Everything also works with the mouse. It fits an 80x24 terminal.
+`?` lists every key. Every key in the footer is also a button, and rows and tabs take clicks. It fits an 80x24
+terminal.
 
 ## Install
 
