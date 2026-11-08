@@ -37,7 +37,11 @@ wikihose
 
 Or, on Windows, download `wikihose-<version>-windows-x86_64.exe` from the
 [releases page](https://github.com/WPTK/wikihose/releases) and run it. No Python is needed. Each release lists
-`SHA256SUMS`, and `gh attestation verify wikihose.exe --repo WPTK/wikihose` checks that the file was built here.
+`SHA256SUMS`, and this checks that the file was built here (see [docs/release.md](docs/release.md)):
+
+```powershell
+gh attestation verify .\wikihose-0.1.0-windows-x86_64.exe --repo WPTK/wikihose --signer-workflow WPTK/wikihose/.github/workflows/release.yml
+```
 
 Until then, run it from a development checkout (see [CONTRIBUTING.md](CONTRIBUTING.md) for setup), in PowerShell:
 

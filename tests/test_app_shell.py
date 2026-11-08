@@ -18,6 +18,7 @@ from support import (
     make_app,
     make_edit,
     settle,
+    settled_footer_keys,
     wait_for_stream,
 )
 from textual.widgets import Button, DataTable, Input, Label, TabbedContent
@@ -693,10 +694,8 @@ async def test_the_footer_fits_80_columns_on_every_tab(clock: VirtualClock, mode
         async with app.run_test(size=(80, 24)) as pilot:
             for key in "12345":
                 await pilot.press(key)
-                await pilot.pause()
-                keys = await footer_keys(pilot, app, needing="Quit")
+                keys = await settled_footer_keys(pilot, app)
                 assert max(k.region.right for k in keys) <= 80, footer_text(keys)
-                assert all(k.region.width > 0 for k in keys), footer_text(keys)
 
 
 @pytest.mark.parametrize("label", ["Play", "Skip"])

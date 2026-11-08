@@ -59,7 +59,7 @@ walkthrough step that proves it on the exe.
 | 3 | Live filters: wiki, hide bots, articles only, minimum byte change. | `test_b_hides_and_shows_bot_edits`, `test_a_toggle_refills_the_log_from_the_last_edits`, `test_size_key_cycles_through_the_steps`, `test_i_switches_wiki_and_starts_the_numbers_over`, `test_clicking_the_filter_words_does_what_the_keys_do`; real-terminal filter journey; L4 |
 | 4 | The Reading tab ranks articles by spike (today's views over the 30-day median). | `test_load_ranks_spikes_and_filters`, `test_shows_25_rows_by_default_with_the_day_and_the_columns`; R2 |
 | 5 | Each Reading row has views, baseline, spike multiple and a 30-day sparkline; a detail pane shows the summary. | `test_the_detail_pane_follows_the_cursor`, `test_spark_scales_to_the_largest_and_merges_days`, Reading snapshots; R3 |
-| 6 | `w` on any article row adds it to the Watchlist, as does typing a title or pasting a URL. | `test_w_on_a_log_row_adds_that_article`, `test_w_on_a_top_row_adds_that_article`, `test_w_on_a_reading_row_watches_that_page`, `test_the_table_takes_the_focus_and_w_names_the_page_at_the_cursor` (Convergence), `test_the_dialog_reads_a_pasted_wikipedia_url`, `test_w_on_the_same_page_twice_says_so_and_does_not_double_count`; W2 |
+| 6 | `w` on any article row adds it to the Watchlist, as does typing a title or pasting a URL. | `test_w_on_a_log_row_adds_that_article`, `test_w_on_a_top_row_adds_that_article`, `test_w_on_a_reading_row_watches_that_page`, `test_the_table_takes_the_focus_and_w_names_the_page_at_the_cursor` (Convergence: it checks the page `w` gets; the add is the shared path the other tests cover), `test_the_dialog_reads_a_pasted_wikipedia_url`, `test_w_on_the_same_page_twice_says_so_and_does_not_double_count`; W2 |
 | 7 | Live edits to watched pages are highlighted and the Watchlist tab shows a count badge. | `test_live_edits_to_watched_pages_count_as_unseen_without_any_request`, `test_a_watched_edit_is_marked_in_the_log_and_others_are_not`, `test_the_tab_lists_each_page_with_its_unseen_count_and_the_badge_adds_them_up`; W3 |
 | 8 | On start, edits made while the app was closed are caught up. | `test_the_catch_up_runs_after_startup_and_feeds_the_badge`, `tests/test_catchup.py`; W4 |
 | 9 | Enter on a tracked edit shows a red/green diff. | `test_enter_opens_the_diff_from_the_revision_last_seen_and_marks_the_page_seen`, `test_added_lines_are_green_and_marked_with_a_plus`, `test_removed_lines_are_red_with_a_minus`; D1, D2 |
@@ -168,7 +168,7 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 
 | Date | Build (commit, exe SHA-256) | Tester | P0 open | P1 open | P2 open | P3 open | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 0 | 4 | Pass for the automated part |
+| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch at `175ae87`, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 1 | 3 | Pass for the automated part |
 
 Findings from that run, and where each went:
 
@@ -180,7 +180,7 @@ Findings from that run, and where each went:
 | A page with a usual of 0 tops the Reading ranking with a five-digit spike | P3 | #26 |
 | Live log rows are in arrival order, not time order | P3 | #27 |
 | Reading at 240 columns spreads its numbers far from the titles; a blank cell in one sparkline | P3 | #28 |
-| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns | P3 | #29 |
+| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns, so `] Skip` cannot be seen or clicked | P2 | #29, named in the release notes' known-issues notice |
 
 No orange anywhere in the captures (the one orange-range value is the window-frame dot the SVG export draws). Every
 tab fits 80x24 and 240x60 with nothing cut sideways, and Reading and Convergence show the demo's recorded day.
@@ -195,5 +195,5 @@ The 28 journeys of `tests/realterm` (14 at each of 80x24 and 120x30), driven thr
 | 2026-11-08 | `5bc6813` | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |
 | 2026-11-08 | `21cf62a`, `38cb4a70…` | `wikihose.exe --demo` | 27 passed, 1 failed, then 28 and 28 (the `?` flake above) |
 | 2026-11-08 | `21cf62a` | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |
-| 2026-11-08 | release-candidate branch, `59c0579d…` | `wikihose.exe --demo` | 28 passed, 0 failed, twice |
+| 2026-11-08 | release-candidate branch at `175ae87`, `59c0579d…` | `wikihose.exe --demo` | 28 passed, 0 failed, twice |
 | 2026-11-08 | release-candidate branch | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |
