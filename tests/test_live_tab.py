@@ -597,3 +597,73 @@ async def test_clicking_enter_open_in_the_live_footer_opens_the_selected_page(
         await settle(app, pilot)
         await click_footer(pilot, app, "Open")
         assert browser.opened == ["https://en.wikipedia.org/wiki/Ada_Lovelace"]
+
+
+def count_selected_messages(table: PageTable, kind: type) -> list[object]:
+    """Record the messages of this kind that the table posts, while still posting them."""
+    seen: list[object] = []
+    post = table.post_message
+
+    def recording(message: object) -> bool:
+        if isinstance(message, kind):
+            seen.append(message)
+        return post(message)  # type: ignore[arg-type]
+
+    table.post_message = recording  # type: ignore[method-assign]
+    return seen
+
+
+async def test_a_single_click_on_another_row_only_moves_the_cursor(clock: VirtualClock, browser: FakeBrowser) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        table = app.query_one("#log", PageTable)
+        selected = count_selected_messages(table, DataTable.RowSelected)
+        assert table.cursor_row == 0
+        await pilot.click("#log", offset=(10, 2))
+        await pilot.pause()
+        assert table.cursor_row == 1
+        assert selected == []  # DataTable's click handler ran once: it moved the cursor and did not select the row
+        assert browser.opened == []
+
+
+async def test_clicking_the_header_posts_one_message_per_click_and_a_double_click_opens_nothing(
+    clock: VirtualClock, browser: FakeBrowser
+) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        table = app.query_one("#log", PageTable)
+        headers = count_selected_messages(table, DataTable.HeaderSelected)
+        await pilot.click("#log", offset=(10, 0))
+        await pilot.pause()
+        assert len(headers) == 1
+        await pilot.double_click("#log", offset=(10, 0))
+        await pilot.pause()
+        assert len(headers) == 3
+        assert browser.opened == []
+
+
+async def test_a_double_click_opens_nothing_when_another_row_arrives_under_the_pointer(
+    clock: VirtualClock, browser: FakeBrowser, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = app_with(clock, [make_edit("First"), make_edit("Second"), make_edit("Third")])
+    async with app.run_test(size=(100, 30)) as pilot:
+        await settle(app, pilot)
+        table = app.query_one("#log", PageTable)
+        original = PageTable.on_click
+
+        def after_the_first_click(self: PageTable, event) -> None:
+            if event.chain == 2:  # the live log changed what is under the pointer between the two clicks
+                self.remove_row(self.ordered_rows[1].key)
+            original(self, event)
+
+        monkeypatch.setattr(PageTable, "on_click", after_the_first_click)
+        await pilot.double_click("#log", offset=(10, 2))
+        await pilot.pause()
+        assert len(table.ordered_rows) == 2
+        assert browser.opened == []
+        monkeypatch.setattr(PageTable, "on_click", original)
+        await pilot.double_click("#log", offset=(10, 2))  # with nothing moving, the same gesture opens the page
+        await pilot.pause()
+        assert len(browser.opened) == 1

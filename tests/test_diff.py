@@ -16,12 +16,12 @@ from wikihose.diff import (
     DiffLine,
     RevisionDiff,
     Span,
-    diff_url,
     fetch_diff,
     parse_diff,
     render_diff,
 )
 from wikihose.net import Client
+from wikihose.titles import diff_url
 
 
 def load(name: str) -> RevisionDiff:

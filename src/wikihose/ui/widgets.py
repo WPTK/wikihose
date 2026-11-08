@@ -9,6 +9,7 @@ from textual import events
 from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import DataTable
+from textual.widgets.data_table import RowKey
 
 BARS = "▁▂▃▄▅▆▇█"
 
@@ -73,6 +74,7 @@ class PageTable(DataTable[Any]):
     ) -> None:
         super().__init__(**kwargs)
         self._resolve = resolve
+        self._pressed_row: RowKey | None = None
         self.watchable = watchable  # whether ``w`` watches the page under the cursor (not on the list of watched pages)
 
     def page_at_cursor(self) -> tuple[str, str] | None:
@@ -108,7 +110,19 @@ class PageTable(DataTable[Any]):
         if self.page_at_cursor() is not None:
             self.post_message(self.Open(self))
 
-    async def _on_click(self, event: events.Click) -> None:
-        await super()._on_click(event)  # moves the cursor to the clicked row
-        if event.chain == 2 and event.style.meta.get("row", -1) >= 0 and event.style.meta.get("column", -1) >= 0:
+    def on_click(self, event: events.Click) -> None:
+        """Open the page on a double click, when both clicks landed on the same row.
+
+        This is ``on_click`` and not ``_on_click`` because Textual runs every class's ``_on_click``, so overriding that
+        name and calling ``super()`` would run DataTable's handler twice. DataTable's own handler still moves the
+        cursor. Textual counts a chain by screen position only, and a live table can put another row under the pointer
+        between the two clicks, so the row is remembered at the first click and compared at the second.
+        """
+        meta = event.style.meta
+        row, column = meta.get("row", -1), meta.get("column", -1)
+        key = self.ordered_rows[row].key if 0 <= row < len(self.ordered_rows) and column >= 0 else None
+        if event.chain == 1:
+            self._pressed_row = key
+        elif event.chain == 2 and key is not None and key == self._pressed_row:
+            self.move_cursor(row=row)  # rows added after the first click may have moved the cursor off it
             self._open()

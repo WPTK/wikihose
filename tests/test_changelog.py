@@ -13,20 +13,20 @@ CONTRIBUTING = ROOT / "CONTRIBUTING.md"
 
 # The one list of allowed gitmoji. CONTRIBUTING.md's table must match it.
 ALLOWED_GITMOJI = (
-    "✨",  # new feature
+    "\u2728",  # new feature
     "\U0001f41b",  # bug fix
-    "⚡️",  # performance
-    "\U0001f512️",  # security
+    "\u26a1\ufe0f",  # performance
+    "\U0001f512\ufe0f",  # security
     "\U0001f484",  # UI or style
-    "♿️",  # accessibility
-    "\U0001f691️",  # critical hotfix
+    "\u267f\ufe0f",  # accessibility
+    "\U0001f691\ufe0f",  # critical hotfix
     "\U0001f4a5",  # breaking change
     "\U0001f525",  # removal
-    "\U0001f5d1️",  # deprecation
+    "\U0001f5d1\ufe0f",  # deprecation
     "\U0001f310",  # localization
     "\U0001f6b8",  # usability
-    "\U0001f4e6️",  # packaging or install change users can see
-    "⬆️",  # user-visible dependency upgrade
+    "\U0001f4e6\ufe0f",  # packaging or install change users can see
+    "\u2b06\ufe0f",  # user-visible dependency upgrade
 )
 SECTION_ORDER = ("Changed", "Added", "Removed", "Fixed")
 VERSION_HEADING = re.compile(r"^## \[(\d+\.\d+\.\d+)\] - (\S.*)$")

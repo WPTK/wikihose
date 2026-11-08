@@ -21,7 +21,7 @@ from rich.text import Text
 
 from wikihose.messages import describe_fetch_error
 from wikihose.net import Client, FetchError
-from wikihose.titles import host_for_wiki
+from wikihose.titles import diff_url, host_for_wiki
 
 MAX_LINES = 300  # lines shown; a bigger diff ends with a notice and a link
 MAX_LINE_CHARS = 1500
@@ -87,12 +87,6 @@ class DiffHeader:
     size_before: int | None = None
     size_after: int | None = None
     url: str | None = None  # the article's address; its text is CC BY-SA, so the heading always says where it is from
-
-
-def diff_url(wiki: str, from_id: int, to_id: int) -> str | None:
-    """The page on the wiki that shows this difference, or None for a wiki without a known host."""
-    host = host_for_wiki(wiki)
-    return None if host is None else f"https://{host}/w/index.php?diff={to_id}&oldid={from_id}"
 
 
 async def fetch_diff(client: Client, wiki: str, from_id: int, to_id: int) -> RevisionDiff:
