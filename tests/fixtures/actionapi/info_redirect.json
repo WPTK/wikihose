@@ -1,0 +1,25 @@
+{
+ "batchcomplete": true,
+ "query": {
+  "redirects": [
+   {
+    "from": "Augusta Ada King",
+    "to": "Ada Lovelace"
+   }
+  ],
+  "pages": [
+   {
+    "pageid": 974,
+    "ns": 0,
+    "title": "Ada Lovelace",
+    "contentmodel": "wikitext",
+    "pagelanguage": "en",
+    "pagelanguagehtmlcode": "en",
+    "pagelanguagedir": "ltr",
+    "touched": "2026-11-08T01:33:04Z",
+    "lastrevid": 1384127064,
+    "length": 98391
+   }
+  ]
+ }
+}
