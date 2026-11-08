@@ -24,6 +24,7 @@ from wikihose.clock import Clock
 from wikihose.messages import describe_fetch_error
 from wikihose.net import Client, FetchError
 from wikihose.store import WatchedPage
+from wikihose.titles import host_for_wiki
 from wikihose.watchlist import Watchlist, api_url
 
 LOOKBACK = timedelta(days=30)
@@ -32,6 +33,8 @@ HISTORY_LIMIT = 50
 MAX_HISTORY_REQUESTS = 4
 _BASE = {"action": "query", "format": "json", "formatversion": "2"}
 _HIDDEN = "(hidden)"
+_UNREADABLE = "Wikipedia sent an answer wikihose could not read."
+_MALFORMED = (KeyError, IndexError, TypeError, ValueError, AttributeError)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +74,12 @@ async def catch_up(
     cutoff = clock.now() - LOOKBACK
     for wiki in dict.fromkeys(page.wiki for page in pages):
         ofwiki = [page for page in pages if page.wiki == wiki]
+        if host_for_wiki(wiki) is None:
+            result.errors.append(f"wikihose cannot check pages on {wiki} yet.")
+            done += len(ofwiki)
+            if progress:
+                progress(done, len(pages))
+            continue
         for start in range(0, len(ofwiki), INFO_BATCH):
             batch = ofwiki[start : start + INFO_BATCH]
             try:
@@ -80,7 +89,12 @@ async def catch_up(
                 infos = None
             for page in batch:
                 if infos is not None:
-                    await _check_page(watchlist, client, cutoff, page, infos.get(page.page_id), result)
+                    try:
+                        await _check_page(watchlist, client, cutoff, page, infos.get(page.page_id), result)
+                    except FetchError as exc:
+                        result.errors.append(f"{page.title}: {describe_fetch_error(exc)}")
+                    except _MALFORMED:  # one odd answer must not stop the other pages
+                        result.errors.append(f"{page.title}: {_UNREADABLE}")
                 done += 1
                 if progress:
                     progress(done, len(pages))
@@ -105,37 +119,40 @@ async def _check_page(
     info: dict[str, Any] | None,
     result: CatchUpResult,
 ) -> None:
+    """Bring one page up to date. The page may be removed or marked seen while a request is in flight, so it is read
+    again from the watchlist after every wait; a removed page is left alone."""
     if info is None or info.get("missing"):
-        if not page.deleted:
-            result.deleted.append(watchlist.set_deleted(page, True))
+        if (now := watchlist.current(page)) is not None and not now.deleted:
+            result.deleted.append(watchlist.set_deleted(now, True))
         return
-    if page.deleted:
-        page = watchlist.set_deleted(page, False)
-    title = str(info.get("title", page.title))
-    if title != page.title:
-        old = page.title
-        page = watchlist.rename(page, title)
-        result.renamed.append((old, page))
+    if (now := watchlist.current(page)) is None:
+        return
+    if now.deleted:
+        now = watchlist.set_deleted(now, False)
+    title = str(info.get("title", now.title))
+    if title != now.title:
+        old = now.title
+        now = watchlist.rename(now, title)
+        result.renamed.append((old, now))
     latest = int(info.get("lastrevid", 0))
-    if latest <= page.seen_rev_id:
+    if latest <= now.last_rev_id:
+        return  # nothing since the newest revision already known
+    baseline = now.last_rev_id
+    revisions = await _history(client, now, cutoff, baseline)
+    if watchlist.current(now) is None:
         return
-    try:
-        revisions = await _history(client, page, cutoff)
-    except FetchError as exc:
-        result.errors.append(f"{page.title}: {describe_fetch_error(exc)}")
-        return
-    edits = _edits(page, revisions)
+    edits = _edits(now, revisions, baseline)
     result.edits.extend(edits)
     watchlist.absorb(
-        page,
+        now,
         unseen=max(len(edits), 1),  # the page changed even if every change is older than the look-back
         last_rev_id=max(latest, edits[0].rev_id if edits else 0),
         last_edit_at=edits[0].at if edits else None,
     )
 
 
-async def _history(client: Client, page: WatchedPage, cutoff: datetime) -> list[dict[str, Any]]:
-    """Revisions of one page, newest first, back to the cutoff or the revision last seen, whichever comes first."""
+async def _history(client: Client, page: WatchedPage, cutoff: datetime, baseline: int) -> list[dict[str, Any]]:
+    """Revisions of one page, newest first, back to the cutoff or the newest revision already known."""
     params: dict[str, Any] = {
         **_BASE,
         "prop": "revisions",
@@ -150,18 +167,21 @@ async def _history(client: Client, page: WatchedPage, cutoff: datetime) -> list[
         try:
             found.extend(data["query"]["pages"][0].get("revisions", []))
             more = data.get("continue")
+            if more and not isinstance(more, dict):
+                raise TypeError("continue is not an object")
+            oldest = found[-1]["revid"] if found else None
         except (KeyError, IndexError, TypeError, AttributeError):
             raise FetchError("bad_data", "revisions were not in the expected shape") from None
-        if not more or (found and found[-1]["revid"] <= page.seen_rev_id):
+        if not more or (oldest is not None and oldest <= baseline):
             break
         params = {**params, **more}
     return found
 
 
-def _edits(page: WatchedPage, revisions: list[dict[str, Any]]) -> list[CatchUpEdit]:
+def _edits(page: WatchedPage, revisions: list[dict[str, Any]], baseline: int) -> list[CatchUpEdit]:
     edits: list[CatchUpEdit] = []
     for index, revision in enumerate(revisions):
-        if revision["revid"] <= page.seen_rev_id:
+        if revision["revid"] <= baseline:
             break
         older = revisions[index + 1] if index + 1 < len(revisions) else None
         size = int(revision.get("size", 0))

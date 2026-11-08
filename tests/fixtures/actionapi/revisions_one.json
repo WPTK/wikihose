@@ -400,12 +400,12 @@
       "user": "ClueBot NG",
       "timestamp": "2025-09-15T09:34:03Z",
       "size": 95408,
-      "comment": "Reverting possible vandalism by [[Special:Contribs/82.219.17.63|82.219.17.63]] to version by Xxanthippe. [[WP:CBFP|Report False Positive?]] Thanks, [[WP:CBNG|ClueBot NG]]. (4420831) (Bot)"
+      "comment": "Reverting possible vandalism by [[Special:Contribs/192.0.2.63|192.0.2.63]] to version by Xxanthippe. [[WP:CBFP|Report False Positive?]] Thanks, [[WP:CBNG|ClueBot NG]]. (4420831) (Bot)"
      },
      {
       "revid": 1311465156,
       "parentid": 1311464851,
-      "user": "82.219.17.63",
+      "user": "192.0.2.63",
       "anon": true,
       "timestamp": "2025-09-15T09:33:56Z",
       "size": 95438,
