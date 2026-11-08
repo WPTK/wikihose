@@ -18,7 +18,7 @@ from typing import Any
 
 from wikihose.clock import SystemClock
 from wikihose.demo_reading import FORMAT, VERSION
-from wikihose.net import Client, RequestBudget
+from wikihose.net import Client, FetchError, RequestBudget
 from wikihose.reading import ReadingData, SpikeRow
 from wikihose.sources.events import Edit, parse_recentchange
 from wikihose.sources.recording import demo_recording, read_recording
@@ -30,7 +30,8 @@ SUMMARIES = 25
 
 
 class Spaced:
-    """Wraps the client so every request waits ``GAP`` seconds first. Retry-After is honored by the client."""
+    """Wraps the client so every request waits ``GAP`` seconds first. The client's own retries come on top: they
+    honor Retry-After on a 429 or 503 and back off on other errors."""
 
     def __init__(self, client: Client) -> None:
         self._client = client
@@ -92,7 +93,11 @@ async def main() -> int:
         wanted += [r.title for r in rows if page_key("enwiki", r.title)[1] in edited and r.title not in wanted]
         summaries: dict[str, Any] = {}
         for title in wanted:
-            summary = await data.summary(title)
+            try:
+                summary = await data.summary(title)
+            except FetchError as error:  # a missing summary is fine; losing six minutes of capture is not
+                print(f"no summary for {title}: {error}", file=sys.stderr)
+                continue
             if summary is not None:
                 summaries[title] = {"title": summary.title, "description": summary.description}
                 summaries[title]["extract"] = summary.extract

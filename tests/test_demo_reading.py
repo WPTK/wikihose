@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import asyncio.base_events
+import asyncio.proactor_events
+import asyncio.selector_events
 import gzip
 import importlib.resources
 import re
@@ -68,6 +72,8 @@ async def test_a_damaged_snapshot_gives_an_empty_ranking(payload: Any) -> None:
 async def test_bad_rows_and_summaries_are_skipped() -> None:
     good = {"title": "Good", "views": 9000, "baseline": 10.0, "multiple": 900.0, "series": [1, 2], "exact": True}
     rows: list[Any] = [good, {"title": "", "views": 1}, {**good, "views": -1}, {**good, "series": ["x"]}, 7]
+    rows += [{**good, "views": True}, {**good, "series": [True]}, {**good, "multiple": float("nan")}]
+    rows += [{**good, "baseline": float("inf")}]
     payload = {"format": FORMAT, "version": VERSION, "day": "2026-11-07", "rows": rows}
     payload["summaries"] = {"Good": {"title": "Good", "description": "", "extract": "Text."}, "Bad": {"title": 1}}
     source = DemoReading(payload)
@@ -106,12 +112,20 @@ async def test_the_demo_fills_the_convergence_tab(clock: VirtualClock) -> None:
 
 @pytest.fixture
 def no_network(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
-    """Every outgoing connection or name lookup fails and is recorded; the event loop's own loopback pair still works."""
+    """Every name lookup and every TCP connect to anything but loopback fails and is recorded.
+
+    Blocked in the socket module (lookups, ``connect``, ``connect_ex``) and in asyncio itself (``create_connection``
+    and ``sock_connect``), because on Windows the proactor loop connects through ``ConnectEx`` without calling
+    ``socket.connect``, and skips the lookup for an IP address. Loopback stays open for the event loop's own socket pair.
+    """
     attempts: list[Any] = []
     real_connect = socket.socket.connect
 
+    def loopback(host: Any) -> bool:
+        return host in ("127.0.0.1", "::1")
+
     def connect(self: socket.socket, address: Any) -> Any:
-        if isinstance(address, tuple) and address[0] in ("127.0.0.1", "::1"):
+        if isinstance(address, tuple) and loopback(address[0]):
             return real_connect(self, address)
         attempts.append(address)
         raise OSError("network blocked by the test")
@@ -120,10 +134,60 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
         attempts.append(args[:2])
         raise socket.gaierror("network blocked by the test")
 
+    async def create_connection(self: Any, factory: Any, host: Any = None, port: Any = None, **kwargs: Any) -> Any:
+        attempts.append((host, port))
+        raise OSError("network blocked by the test")
+
+    def guard_sock_connect(real: Any) -> Any:
+        async def sock_connect(self: Any, sock: socket.socket, address: Any) -> Any:
+            if isinstance(address, tuple) and loopback(address[0]):
+                return await real(self, sock, address)
+            attempts.append(address)
+            raise OSError("network blocked by the test")
+
+        return sock_connect
+
     monkeypatch.setattr(socket.socket, "connect", connect)
     monkeypatch.setattr(socket.socket, "connect_ex", lambda self, address: connect(self, address))
     monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    monkeypatch.setattr(asyncio.base_events.BaseEventLoop, "create_connection", create_connection)
+    for loop_class in (
+        asyncio.base_events.BaseEventLoop,
+        asyncio.selector_events.BaseSelectorEventLoop,
+        asyncio.proactor_events.BaseProactorEventLoop,
+    ):
+        monkeypatch.setattr(loop_class, "sock_connect", guard_sock_connect(loop_class.sock_connect))
     return attempts
+
+
+def test_the_guard_catches_an_ip_address_too(no_network: list[Any]) -> None:
+    async def reach() -> None:
+        await asyncio.get_running_loop().create_connection(asyncio.Protocol, "192.0.2.1", 443)
+
+    with pytest.raises(OSError, match="blocked"):
+        asyncio.run(reach())
+    assert no_network == [("192.0.2.1", 443)]
+
+
+def test_the_demo_wiring_gives_the_app_no_client_and_the_recorded_reading(
+    no_network: list[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    built: dict[str, Any] = {}
+
+    class FakeApp:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            built.update(kwargs)
+
+        async def run_async(self) -> None:
+            return None
+
+    import wikihose.ui.app
+
+    monkeypatch.setattr(wikihose.ui.app, "WikihoseApp", FakeApp)
+    assert main(["--demo", "--no-config"]) == 0
+    assert built["client"] is None
+    assert isinstance(built["reading"]("enwiki"), DemoReading)
+    assert no_network == []
 
 
 def test_demo_headless_opens_no_socket(no_network: list[Any], capsys: pytest.CaptureFixture[str]) -> None:

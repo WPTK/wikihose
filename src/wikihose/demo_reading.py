@@ -9,6 +9,7 @@ from __future__ import annotations
 import gzip
 import importlib.resources
 import json
+import math
 from datetime import date
 from typing import Any
 
@@ -20,16 +21,23 @@ VERSION = 1
 SUMMARY_FIELDS = ("title", "description", "extract")
 
 
+def _count(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_VIEWS
+
+
+def _number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
 def _row(item: Any) -> SpikeRow | None:
     """One ranking row from the file, or None when it is not one: the file is package data, but read it defensively."""
     if not isinstance(item, dict):
         return None
     title, views, baseline, multiple = item.get("title"), item.get("views"), item.get("baseline"), item.get("multiple")
     series, exact = item.get("series", []), item.get("exact")
-    numbers_ok = isinstance(views, int) and 0 <= views <= MAX_VIEWS and isinstance(baseline, int | float)
-    if not (isinstance(title, str) and title and numbers_ok and isinstance(multiple, int | float)):
+    if not (isinstance(title, str) and title and _count(views) and _number(baseline) and _number(multiple)):
         return None
-    if not isinstance(series, list) or not all(isinstance(v, int) for v in series) or not isinstance(exact, bool):
+    if not isinstance(series, list) or not all(_count(v) for v in series) or not isinstance(exact, bool):
         return None
     return SpikeRow(title, int(views), float(baseline), float(multiple), tuple(series), exact)  # type: ignore[arg-type]
 
