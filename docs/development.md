@@ -34,7 +34,7 @@ Drop `--check` from `ruff format` to rewrite files. Ruff uses a 120 column limit
 function in `src/`. Vulture only reports unused code it is nearly certain about, so a report means a real leftover. Its
 paths are set in `pyproject.toml`, so it needs no arguments.
 
-`--selftest` checks the install without the network (themes, config defaults, the database migration, the bundled sample
+`--selftest` checks the install without the network (themes, config defaults, the database migration from version 1 to 2, the bundled sample
 recording and the request budget) and prints `selftest: ok`. It exits 1 and prints `selftest: FAILED (n)` otherwise.
 
 ## CI gates
@@ -60,8 +60,13 @@ src/wikihose/
   config.py     the Config dataclass, load_config (warns, never raises) and save_config
   net.py        the shared HTTP client: User-Agent, request budget, retries, disk cache, event stream
   sse.py        the server-sent events parser
-  titles.py     title normalization and article URL parsing
-  store.py      SQLite storage with versioned migrations
+  titles.py     title normalization, article URL parsing and host_for_wiki (enwiki to en.wikipedia.org)
+  messages.py   plain-words text for a FetchError
+  store.py      SQLite storage with versioned migrations (schema version 2: the watchlist columns)
+  watchlist_input.py  reading what the user types after w: a title or a pasted article URL
+  watchlist.py  the Watchlist service: add by page ID, in-memory match by (wiki, title), moves, unseen counts
+  catchup.py    startup catch-up of the watched pages through the Action API
+  diff.py       the REST compare payload as data, and render_diff for a Rich Text
   sources/      one DataSource interface, two sources
     events.py     Edit, PageMove, FeedStatus and parse_recentchange
     protocol.py   the DataSource protocol
