@@ -364,8 +364,10 @@ async def test_footer_shows_the_replay_keys_only_in_a_replay(clock: VirtualClock
         async with replay.run_test(size=(140, 30)) as pilot:
             await pilot.pause()
             text = footer_text(await footer_keys(pilot, replay, needing="Skip"))
-            for label in ("Play", "Faster", "Slower", "Skip"):
+            for label in ("Play", "Skip"):
                 assert label in text
+            for label in ("Faster", "Slower"):  # in ? help only, so the footer fits 80 columns
+                assert label not in text
     live = app_with(clock)
     async with live.run_test(size=(140, 30)) as pilot:
         await pilot.pause()
@@ -684,7 +686,20 @@ async def test_clicking_each_live_footer_key_does_what_its_key_does(clock: Virtu
                 assert app._exit
 
 
-@pytest.mark.parametrize("label", ["Play", "Faster", "Slower", "Skip"])
+@pytest.mark.parametrize("mode", ["demo", "stream"])
+async def test_the_footer_fits_80_columns_on_every_tab(clock: VirtualClock, mode: str) -> None:
+    with sample_recording() as path:
+        app = make_app(ReplaySource(path, clock), clock, loop_replay=True) if mode == "demo" else app_with(clock)
+        async with app.run_test(size=(80, 24)) as pilot:
+            for key in "12345":
+                await pilot.press(key)
+                await pilot.pause()
+                keys = await footer_keys(pilot, app, needing="Quit")
+                assert max(k.region.right for k in keys) <= 80, footer_text(keys)
+                assert all(k.region.width > 0 for k in keys), footer_text(keys)
+
+
+@pytest.mark.parametrize("label", ["Play", "Skip"])
 async def test_clicking_each_replay_footer_key_does_what_its_key_does(clock: VirtualClock, label: str) -> None:
     with sample_recording() as path:
         source = ReplaySource(path, clock)

@@ -168,7 +168,22 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 
 | Date | Build (commit, exe SHA-256) | Tester | P0 open | P1 open | P2 open | P3 open | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 0 | 4 | Pass for the automated part |
+
+Findings from that run, and where each went:
+
+| Finding | Severity | Where |
+| --- | --- | --- |
+| At 80x24 the demo's Live footer was cut at `+ Faste`; Slower and Skip could not be seen or clicked | P2 | Fixed in the release-candidate PR: `+` and `-` are in `?` help only (the top bar shows the speed); `test_the_footer_fits_80_columns_on_every_tab` |
+| `scripts/capture_demo.py --tab 2` and `--tab 5` showed "needs a live connection" instead of the demo's Reading numbers | P2 | Fixed in the release-candidate PR |
+| The `?` journey could read the help screen before all of it was drawn (one failure in three exe runs) | P3 | Fixed in the release-candidate PR: it waits for every line it checks |
+| A page with a usual of 0 tops the Reading ranking with a five-digit spike | P3 | #26 |
+| Live log rows are in arrival order, not time order | P3 | #27 |
+| Reading at 240 columns spreads its numbers far from the titles; a blank cell in one sparkline | P3 | #28 |
+| A plain `--replay` footer (with `i Wiki`) is cut at 80 columns | P3 | #29 |
+
+No orange anywhere in the captures (the one orange-range value is the window-frame dot the SVG export draws). Every
+tab fits 80x24 and 240x60 with nothing cut sideways, and Reading and Convergence show the demo's recorded day.
 
 ### Real-input run (tui-test)
 
@@ -178,3 +193,7 @@ The 28 journeys of `tests/realterm` (14 at each of 80x24 and 120x30), driven thr
 | --- | --- | --- | --- |
 | 2026-11-08 | `5bc6813` (source before the rebase onto main), `e192d20d4f0d1152f30540894f0a5200bb55dede4ad115c79e4fe4c327450b78` | `wikihose.exe --demo` | 28 passed, 0 failed |
 | 2026-11-08 | `5bc6813` | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |
+| 2026-11-08 | `21cf62a`, `38cb4a70…` | `wikihose.exe --demo` | 27 passed, 1 failed, then 28 and 28 (the `?` flake above) |
+| 2026-11-08 | `21cf62a` | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |
+| 2026-11-08 | release-candidate branch, `59c0579d…` | `wikihose.exe --demo` | 28 passed, 0 failed, twice |
+| 2026-11-08 | release-candidate branch | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |
