@@ -64,9 +64,9 @@ async def capture(size: tuple[int, int] = SIZE, tab: int | None = None) -> str:
     app = WikihoseApp(source, Config(theme="wikihose-dark", wiki="enwiki"), clock=clock, tz=TIMEZONE, loop_replay=True)
     async with app.run_test(size=size) as pilot:
         await asyncio.wait_for(_until_parked(clock, pilot), timeout=120)
-        tab = app.query_one(LiveTab)
-        tab.flush_log()
-        tab.refresh_side()
+        live = app.query_one(LiveTab)
+        live.flush_log()
+        live.refresh_side()
         app.query_one(TopBar).refresh_text()
         if tab is not None:
             await pilot.press(str(tab))
