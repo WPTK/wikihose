@@ -19,6 +19,10 @@ def _norm(text: str) -> str:
     return " ".join(text.replace("_", " ").split()).casefold()
 
 
+def _list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 @dataclass(frozen=True)
 class NamespaceFilter:
     """The non-article namespace names of one wiki, plus its main page title."""
@@ -27,23 +31,31 @@ class NamespaceFilter:
     main_page: str | None = None
 
     @classmethod
-    def from_siteinfo(cls, payload: Mapping[str, Any]) -> NamespaceFilter:
-        """Build a filter from a ``format=json`` siteinfo response (the whole body or its ``query`` part)."""
-        query = payload.get("query", payload)
+    def from_siteinfo(cls, payload: Any) -> NamespaceFilter:
+        """Build a filter from a ``format=json`` siteinfo response (the whole body or its ``query`` part).
+
+        Anything that is not the expected shape is skipped, so a damaged response gives a filter that drops less.
+        """
+        query = payload.get("query", payload) if isinstance(payload, Mapping) else {}
+        if not isinstance(query, Mapping):
+            query = {}
         prefixes: set[str] = set()
-        namespaces = query.get("namespaces", {})  # a dict in formatversion 1, a list in 2
-        for ns in namespaces.values() if isinstance(namespaces, Mapping) else namespaces:
-            if ns.get("id", 0) == 0:
+        namespaces = query.get("namespaces")  # a dict in formatversion 1, a list in 2
+        for ns in namespaces.values() if isinstance(namespaces, Mapping) else _list(namespaces):
+            if not isinstance(ns, Mapping) or ns.get("id", 0) == 0:
                 continue
             for key in ("*", "name", "canonical"):
                 if ns.get(key):
                     prefixes.add(_norm(str(ns[key])))
-        for alias in query.get("namespacealiases", []):
+        for alias in _list(query.get("namespacealiases")):
+            if not isinstance(alias, Mapping):
+                continue
             name = alias.get("*") or alias.get("alias")
             if alias.get("id", 0) != 0 and name:
                 prefixes.add(_norm(str(name)))
-        main = query.get("general", {}).get("mainpage")
-        return cls(frozenset(prefixes), _norm(main) if main else None)
+        general = query.get("general")
+        main = general.get("mainpage") if isinstance(general, Mapping) else None
+        return cls(frozenset(prefixes), _norm(str(main)) if main else None)
 
     def is_article(self, title: str) -> bool:
         """True for a main-namespace page that is not the wiki's front page."""
