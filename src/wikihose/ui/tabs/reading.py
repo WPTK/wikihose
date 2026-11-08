@@ -16,30 +16,15 @@ from textual.widgets import DataTable, Static
 
 from wikihose.net import FetchError
 from wikihose.reading import MIN_VIEWS, ReadingSource, SpikeRow, Summary
-from wikihose.ui.widgets import PageTable
+from wikihose.ui.widgets import PageTable, spark
 
 ROW_STEPS = (25, 50, 100)  # the first is the default (owner's choice)
-BARS = "▁▂▃▄▅▆▇█"
 VIEWS_WIDTH = 10
 USUAL_WIDTH = 9
 SPIKE_WIDTH = 10
 WIDE_FROM = 100  # columns of window width where the sparkline gets one cell per day instead of one per two days
 EXTRACT_LIMIT = 260  # what fits the 4 spare lines of the detail pane at 80 columns
 Factory = Callable[[str], ReadingSource | None]
-
-
-def spark(series: tuple[int, ...], width: int) -> str:
-    """A sparkline of ``width`` cells for the daily series; days are merged (the largest wins) when they do not fit."""
-    if not series or width <= 0:
-        return ""
-    count = min(width, len(series))
-    cells = []
-    for i in range(count):
-        start = i * len(series) // count
-        end = max((i + 1) * len(series) // count, start + 1)
-        cells.append(max(series[start:end]))
-    top = max(cells) or 1
-    return "".join(BARS[min(len(BARS) - 1, c * len(BARS) // (top + 1))] for c in cells)
 
 
 def spike_text(row: SpikeRow) -> str:

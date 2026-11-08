@@ -1,4 +1,4 @@
-"""Small widgets shared by the tabs and the shell."""
+"""Small widgets and helpers shared by the tabs and the shell."""
 
 from __future__ import annotations
 
@@ -6,6 +6,22 @@ from collections.abc import Callable
 from typing import Any
 
 from textual.widgets import DataTable
+
+BARS = "▁▂▃▄▅▆▇█"
+
+
+def spark(series: tuple[int, ...], width: int) -> str:
+    """A sparkline of ``width`` cells for the daily series; days are merged (the largest wins) when they do not fit."""
+    if not series or width <= 0:
+        return ""
+    count = min(width, len(series))
+    cells = []
+    for i in range(count):
+        start = i * len(series) // count
+        end = max((i + 1) * len(series) // count, start + 1)
+        cells.append(max(series[start:end]))
+    top = max(cells) or 1
+    return "".join(BARS[min(len(BARS) - 1, c * len(BARS) // (top + 1))] for c in cells)
 
 
 class PageTable(DataTable[Any]):

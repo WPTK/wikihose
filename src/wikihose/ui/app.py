@@ -32,6 +32,7 @@ from wikihose.sources.protocol import DataSource
 from wikihose.sources.replay import ReplaySource
 from wikihose.store import Store, WatchedPage
 from wikihose.titles import page_key
+from wikihose.trend import Trends
 from wikihose.ui.bars import HealthBar, TopBar
 from wikihose.ui.bindings import declared_bindings, help_text, key_label
 from wikihose.ui.dialogs import FIXED_HELP, AddPage, HelpScreen
@@ -92,7 +93,7 @@ class MainScreen(Screen[None]):
             with TabPane("Reading", id="reading"):
                 yield ReadingTab(shell.reading, shell.wiki)
             with TabPane("Watchlist", id="watchlist"):
-                yield WatchlistTab(shell.watchlist, shell.tz, shell.last_editor)
+                yield WatchlistTab(shell.watchlist, shell.tz, shell.last_editor, shell.trends)
             with TabPane("Diff", id="diff"):
                 yield DiffTab(shell.client, shell.watchlist, shell.tz)
             with TabPane("Convergence", id="convergence"):
@@ -131,7 +132,9 @@ class MainScreen(Screen[None]):
         if pane is None:
             return
         for widget in pane.query("*"):
-            if widget.focusable:
+            # A table with nothing to show is hidden with display: none, which "focusable" does not look at; focusing it
+            # leaves the focus on a widget that is not there until the screen next drops it (and its keys show in help).
+            if widget.focusable and all(w.display for w in widget.ancestors_with_self):
                 widget.focus()
                 return
 
@@ -231,6 +234,7 @@ class WikihoseApp(App[None]):
                     deleted=saved.deleted,
                 )
         self.watchlist = Watchlist(backing, client, clock)
+        self.trends = Trends(backing, client, clock)
         self._editors: dict[tuple[str, int], str] = {}  # last editor seen this run, by (wiki, page ID)
         self._badge_queued = False
         self._tab = "live"

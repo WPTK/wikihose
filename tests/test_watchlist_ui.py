@@ -43,6 +43,17 @@ def store(tmp_path: Path) -> Iterator[Store]:
     db.close()
 
 
+PAGEVIEWS = r".*/metrics/pageviews/per-article/.*"
+
+
+@pytest.fixture(autouse=True)
+def _no_pageviews() -> Iterator[None]:
+    """Showing the tab asks Pageviews for each page's trend; these tests are about other things, so there is none."""
+    with respx.mock:
+        respx.get(url__regex=PAGEVIEWS).mock(return_value=httpx.Response(404))
+        yield
+
+
 def watch_ada(store: Store, clock: VirtualClock, *, unseen: int = 0) -> None:
     """Ada Lovelace, seen up to ADA_PREVIOUS; with ``unseen`` the newest revision has arrived."""
     store.add_watch("enwiki", ADA_ID, "Ada Lovelace", clock.now(), ADA_PREVIOUS)

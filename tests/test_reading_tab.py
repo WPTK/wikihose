@@ -22,10 +22,10 @@ from wikihose.ui.tabs.reading import (
     ReadingTab,
     columns,
     describe,
-    spark,
     spike_text,
     usual_text,
 )
+from wikihose.ui.widgets import spark
 
 SERIES = tuple([100] * 29 + [9000])
 
