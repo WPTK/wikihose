@@ -11,6 +11,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.timer import Timer
 from textual.widgets import DataTable, Static
 
 from wikihose.net import FetchError
@@ -19,11 +20,11 @@ from wikihose.ui.widgets import PageTable
 
 ROW_STEPS = (25, 50, 100)  # the first is the default (owner's choice)
 BARS = "▁▂▃▄▅▆▇█"
-VIEWS_WIDTH = 9
+VIEWS_WIDTH = 10
 USUAL_WIDTH = 9
-SPIKE_WIDTH = 8
+SPIKE_WIDTH = 10
 WIDE_FROM = 100  # columns of window width where the sparkline gets one cell per day instead of one per two days
-EXTRACT_LIMIT = 420
+EXTRACT_LIMIT = 260  # what fits the 4 spare lines of the detail pane at 80 columns
 Factory = Callable[[str], ReadingSource | None]
 
 
@@ -89,6 +90,7 @@ class ReadingTab(Vertical):
         self._started = False
         self._message = ""  # a loading, error or replay message; empty means show the usual one-line description
         self._summaries: dict[str, Summary | None] = {}
+        self._retry: Timer | None = None
 
     # --- layout ------------------------------------------------------------------------------------------------------
 
@@ -113,10 +115,11 @@ class ReadingTab(Vertical):
     # --- loading -----------------------------------------------------------------------------------------------------
 
     def load(self) -> None:
+        self._stop_retry()
         if self._source is None:
             self._rows = []
             self._draw()
-            self._say("Reading needs a live connection; it is not available in a replay.")
+            self._say("Reading needs a live connection; it is not available in a replay or for this wiki.")
             return
         # Textual types a worker as returning Never; passing partial() keeps the coroutine unstarted if it is cancelled
         job = partial(self._load, self._source)
@@ -127,9 +130,11 @@ class ReadingTab(Vertical):
         try:
             rows = await source.load(lambda done, total: self._say(f"Loading… {done}/{total}"))
         except FetchError as error:
+            if source is not self._source:
+                return
             self._say(describe(error))
             if error.kind == "rate_limited":
-                self.set_timer(max(error.retry_after or 5, 1), self.load)
+                self._retry = self.set_timer(max(error.retry_after or 5, 1), self.load)
             return
         if source is not self._source:  # the wiki changed while this was loading
             return
@@ -137,12 +142,19 @@ class ReadingTab(Vertical):
         self._draw()
         self._say("")
 
+    def _stop_retry(self) -> None:
+        if self._retry is not None:
+            self._retry.stop()
+            self._retry = None
+
     def set_wiki(self, wiki: str) -> None:
         """Follow the Live tab to another wiki: forget the rows and, if the tab was opened, load the new ones."""
         if wiki == self.wiki:
             return
         self.wiki = wiki
         self._source = self._factory(wiki)
+        self._stop_retry()
+        self._message = ""
         self._rows = []
         self._summaries.clear()
         self._draw()
@@ -155,7 +167,6 @@ class ReadingTab(Vertical):
     def action_more_rows(self) -> None:
         self._limit = ROW_STEPS[(ROW_STEPS.index(self._limit) + 1) % len(ROW_STEPS)]
         self._draw()
-        self._say("")
 
     # --- the table ---------------------------------------------------------------------------------------------------
 
@@ -188,6 +199,7 @@ class ReadingTab(Vertical):
         article, cells = columns(width)
         table = self.query_one("#reading-table", PageTable)
         keep = table.cursor_key()
+        scroll = table.scroll_y
         table.clear(columns=True)
         table.add_column("Article", width=article, key="Article")
         table.add_column(Text("Views", justify="right"), width=VIEWS_WIDTH, key="Views")
@@ -210,6 +222,7 @@ class ReadingTab(Vertical):
             )
         if keep in self._by_title:
             table.move_cursor(row=table.get_row_index(keep), animate=False, scroll=False)
+            self.call_after_refresh(table.scroll_to, y=scroll, animate=False, immediate=True)
         self._draw_status()
         self._show_detail(table.cursor_key())
 
@@ -241,7 +254,8 @@ class ReadingTab(Vertical):
             summary = None
         if source is not self._source:
             return
-        self._summaries[row.title] = summary
+        if summary is not None:  # a failure is not remembered, so moving back onto the row tries again
+            self._summaries[row.title] = summary
         if self.query_one("#reading-table", PageTable).cursor_key() == row.title:
             self._render_detail(row, summary, loading=False)
 

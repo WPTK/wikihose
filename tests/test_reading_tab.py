@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import Any
 
@@ -13,7 +14,17 @@ from wikihose.clock import VirtualClock
 from wikihose.net import FetchError
 from wikihose.reading import Progress, SpikeRow, Summary
 from wikihose.ui.app import WikihoseApp
-from wikihose.ui.tabs.reading import ReadingTab, columns, describe, spark, spike_text, usual_text
+from wikihose.ui.tabs.reading import (
+    SPIKE_WIDTH,
+    USUAL_WIDTH,
+    VIEWS_WIDTH,
+    ReadingTab,
+    columns,
+    describe,
+    spark,
+    spike_text,
+    usual_text,
+)
 
 SERIES = tuple([100] * 29 + [9000])
 
@@ -58,7 +69,7 @@ async def settle_reading(app: WikihoseApp, pilot: Any) -> ReadingTab:
     tab = app.query_one(ReadingTab)
     for _ in range(200):
         await pilot.pause()
-        if tab.query_one("#reading-table", DataTable).row_count or "Loading" not in tab._message:
+        if tab._started and not tab.workers._workers:  # the load worker has finished
             break
     await pilot.pause()
     return tab
@@ -96,7 +107,8 @@ def test_rough_figures_carry_a_tilde() -> None:
 @pytest.mark.parametrize("width", [80, 100, 120, 200])
 def test_columns_fit_without_sideways_scrolling(width: int) -> None:
     article, cells = columns(width)
-    assert article + 9 + 9 + 8 + cells + 2 * 5 + 2 <= width or article == 10
+    assert article >= 10
+    assert article + VIEWS_WIDTH + USUAL_WIDTH + SPIKE_WIDTH + cells + 2 * 5 + 2 <= width
 
 
 def test_describe_names_the_problem() -> None:
@@ -266,3 +278,118 @@ async def test_help_on_the_reading_tab_lists_its_keys(clock: VirtualClock) -> No
         await pilot.press("question_mark")
         await pilot.pause()
         assert help_keys(app) == ["r", "n", "w", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
+
+
+async def test_n_and_r_in_a_replay_keep_the_replay_message(clock: VirtualClock) -> None:
+    app = reading_app(clock, None)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await pilot.press("n", "r")
+        await pilot.pause()
+        assert "needs a live connection" in status(app)
+
+
+async def test_n_keeps_an_error_message_showing(clock: VirtualClock) -> None:
+    app = reading_app(clock, FakeReading(error=FetchError("down", "HTTP 500")))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        await pilot.press("n")
+        await pilot.pause()
+        assert "could not reach" in status(app)
+
+
+async def test_the_cursor_stays_on_its_article_through_n_and_r(clock: VirtualClock) -> None:
+    app = reading_app(clock, FakeReading(make_rows(120)))
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        await pilot.press("down", "down", "down", "down")
+        await pilot.press("n")
+        await pilot.pause()
+        assert table(app).cursor_key() == "Page_4"
+        await pilot.press("r")
+        await settle_reading(app, pilot)
+        assert table(app).cursor_key() == "Page_4"
+
+
+async def test_a_failed_summary_is_tried_again_when_the_row_is_visited_again(clock: VirtualClock) -> None:
+    fake = FakeReading()
+    app = reading_app(clock, fake)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        await pilot.press("down", "down", "down")  # Page_3 has no summary
+        for _ in range(20):
+            await pilot.pause()
+        await pilot.press("up")
+        await pilot.press("down")
+        for _ in range(20):
+            await pilot.pause()
+        assert fake.summaries.count("Page_3") >= 2
+
+
+async def test_a_rate_limit_retry_is_cancelled_by_a_wiki_change(clock: VirtualClock) -> None:
+    limited = FakeReading(error=FetchError("rate_limited", "HTTP 429", retry_after=30))
+    good = FakeReading()
+
+    def factory(wiki: str) -> FakeReading:
+        return limited if wiki == "enwiki" else good
+
+    app = make_app(ListSource(clock), clock, reading=factory)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        tab = app.query_one(ReadingTab)
+        assert "rate limited" in status(app) and tab._retry is not None
+        tab.set_wiki("dewiki")
+        await settle_reading(app, pilot)
+        assert tab._retry is None and good.loads == 1 and limited.loads == 1
+        assert table(app).row_count == 25
+
+
+async def test_a_load_that_finishes_after_a_wiki_change_is_dropped(clock: VirtualClock) -> None:
+    class Slow(FakeReading):
+        async def load(self, progress: Any = None) -> list[SpikeRow]:
+            await asyncio.sleep(0.2)
+            return await super().load(progress)
+
+    slow, good = Slow(), FakeReading(make_rows(30))
+    app = make_app(ListSource(clock), clock, reading=lambda wiki: slow if wiki == "enwiki" else good)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("2")
+        await pilot.pause()
+        app.query_one(ReadingTab).set_wiki("dewiki")
+        await settle_reading(app, pilot)
+        await asyncio.sleep(0.4)
+        await pilot.pause()
+        assert table(app).row_count == 25 and "25 of 30" in status(app)
+
+
+async def test_a_long_summary_is_cut_with_an_ellipsis_inside_the_pane(clock: VirtualClock) -> None:
+    class Wordy(FakeReading):
+        async def summary(self, title: str) -> Summary | None:
+            return Summary(title, "a test page", "word " * 200)
+
+    app = reading_app(clock, Wordy())
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        for _ in range(30):
+            await pilot.pause()
+        text = detail(app)
+        assert text.rstrip().endswith("…") and len(text) < 330
+        assert text.count(chr(10)) < 7
+
+
+async def test_wide_numbers_fit_their_columns(clock: VirtualClock) -> None:
+    big = SpikeRow("Big", 10_000_000, 100.0, 100_000.0, (), False)
+    app = reading_app(clock, FakeReading([big]))
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.press("2")
+        await settle_reading(app, pilot)
+        assert (
+            str(table(app).get_cell_at((0, 1))) == "10,000,000"
+            and len(str(table(app).get_cell_at((0, 1)))) <= VIEWS_WIDTH
+        )
+        assert len(str(table(app).get_cell_at((0, 3)))) <= SPIKE_WIDTH

@@ -11,7 +11,6 @@ from test_reading_tab import FakeReading, settle_reading
 from wikihose.clock import VirtualClock
 from wikihose.config import Config
 from wikihose.reading import SpikeRow, Summary
-from wikihose.ui.tabs.reading import ReadingTab
 
 CLOCK_START = __import__("datetime").datetime(2026, 11, 7, 12, 0, tzinfo=__import__("datetime").UTC)
 SERIES = (120, 130, 110, 100, 140, 120, 125, 118, 133, 129, 111, 105, 99, 140, 150, 120, 115, 130, 128, 119, 121, 117,
@@ -59,4 +58,3 @@ def test_reading_tab(snap_compare: Any, theme: str, size: tuple[int, int]) -> No
             await pilot.pause()
 
     assert snap_compare(app, terminal_size=size, run_before=open_reading)
-    assert ReadingTab
