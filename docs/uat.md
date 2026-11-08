@@ -156,3 +156,12 @@ Fill in during the run.
 | Date | Build (commit, exe SHA-256) | Tester | P0 open | P1 open | P2 open | P3 open | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+
+### Real-input run (tui-test)
+
+The 28 journeys of `tests/realterm` (14 at each of 80x24 and 120x30), driven through a real pseudo-terminal.
+
+| Date | Build (commit, exe SHA-256) | Target | Result |
+| --- | --- | --- | --- |
+| 2026-11-08 | `5bc6813` (source before the rebase onto main), `e192d20d4f0d1152f30540894f0a5200bb55dede4ad115c79e4fe4c327450b78` | `wikihose.exe --demo` | 28 passed, 0 failed |
+| 2026-11-08 | `5bc6813` | `python -m wikihose --demo` (Python 3.13) | 28 passed, 0 failed |

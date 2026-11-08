@@ -43,6 +43,8 @@ dev = [
     "vulture>=2.16",
     "mypy>=2.4.1",
     "build>=1.6.1,<2",
+    "tui-test==0.1.1",
+    "psutil>=6",
 ]
 
 [project.urls]
