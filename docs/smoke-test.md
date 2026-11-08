@@ -4,12 +4,13 @@ What the owner runs by hand after `release.yml` and `post-release.yml` are green
 actually get, in a folder that has nothing of ours in it. Windows PowerShell or PowerShell 7; every block can be pasted
 as it is. Change `$v` to the version just released.
 
-If a step fails, stop and tell the manager session which step and what it printed. Do not delete anything on PyPI.
+If a step fails, stop and tell the maintainer which step and what it printed. Do not delete anything on PyPI.
 
 ## 1. The Windows executable
 
 ```powershell
 $v = "0.1.0"
+$ProgressPreference = "SilentlyContinue"   # makes downloads fast in Windows PowerShell 5.1
 $dir = Join-Path $env:TEMP "wikihose-smoke"
 Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $dir | Out-Null
@@ -22,12 +23,12 @@ Invoke-WebRequest "$base/wikihose-$v-windows-x86_64.exe" -OutFile wikihose.exe
 Check the checksum. Expected output: `True`.
 
 ```powershell
-$want = ((Get-Content SHA256SUMS | Select-String "windows-x86_64.exe") -split "\s+")[0]
+$want = ((Get-Content SHA256SUMS | Select-String -SimpleMatch "-windows-x86_64.exe").Line -split "\s+")[0]
 $got = (Get-FileHash .\wikihose.exe -Algorithm SHA256).Hash.ToLower()
 $want -eq $got
 ```
 
-Check the build attestation (needs the GitHub CLI, `gh`). Expected: `Verification succeeded!`.
+Check the build attestation (needs the GitHub CLI, `gh`, signed in with `gh auth login`; an authentication error here is not a release defect). Expected: `Verification succeeded!`.
 
 ```powershell
 gh attestation verify .\wikihose.exe --repo WPTK/wikihose
@@ -47,6 +48,7 @@ the exe is not code-signed; choose More info, then Run anyway. That is expected 
 ## 2. Install from PyPI with pipx
 
 ```powershell
+$v = "0.1.0"   # set again on purpose: a new window forgets it
 pipx install wikihose==$v
 wikihose --version
 wikihose --selftest
@@ -57,17 +59,17 @@ Expected: the same two results as above. If `pipx` is not installed, run `python
 
 ## 3. Open the app
 
-In Windows Terminal, in a plain folder:
+Turn Wi-Fi off first for the demo. In Windows Terminal, in a plain folder:
 
 ```powershell
 wikihose --demo
 ```
 
-- [ ] The app opens with no network and shows the Live tab with edits scrolling.
+- [ ] The app opens with the network off and shows the Live tab with edits scrolling.
 - [ ] Keys `1` to `5` change tab, `?` opens help, `q` quits.
 - [ ] After quitting, the terminal is back to normal (you can type, and the colors are restored).
 
-Then the live feed:
+Turn Wi-Fi back on, then the live feed:
 
 ```powershell
 wikihose

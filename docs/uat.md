@@ -1,6 +1,6 @@
 # User acceptance testing
 
-The framework for the full UAT run that gates a release. Session 4 runs it on the release candidate, using the built
+The framework for the full UAT run that gates a release. The person running the release runs it on the release candidate, using the built
 exe, and fills in the results at the bottom. A row or step marked `TODO` belongs to a tab that has not merged yet; the
 person running the UAT replaces it when the tab lands. The target behaviour comes from [design.md](design.md).
 
@@ -24,7 +24,7 @@ A release candidate passes when all of these hold:
 - Every README claim in the table below has a test or a walkthrough step that passed on the built exe.
 - P2 and P3 findings are filed as issues, or as lines in [deferred.md](deferred.md), with the release notes naming any
   that a user would meet.
-- `--version` and `--selftest` pass on the exe, on the wheel and from PyPI ([smoke-test.md](smoke-test.md)).
+- `--version` and `--selftest` pass on the exe and from PyPI ([smoke-test.md](smoke-test.md)); the wheel and sdist are checked by `build.yml`.
 - The state matrix has no empty cell for a tab that exists.
 
 ## How to run it
@@ -36,7 +36,7 @@ Automated first, then by hand:
 .venv\Scripts\python -m pytest -m uat
 ```
 
-`-m uat` runs the tests that drive the whole app (they are left out of the default run). Then the real-input run on the
+`-m uat` runs the tests that drive the whole app (they are left out of the default run; exit code 5, "no tests collected", is not a failure until the first `uat` test exists). Then the real-input run on the
 built exe (`tui-test`, keys and mouse on the actual `wikihose.exe`), then the walkthroughs below by hand in Windows
 Terminal. Test sizes: 80x24 (the floor), 120x30, 160x48 and 240x60. File each finding as a GitHub issue labelled with
 its severity (`P0` to `P3`) and link it in the results table.
@@ -49,7 +49,7 @@ walkthrough step that proves the claim.
 
 | # | Claim | Test |
 | --- | --- | --- |
-| 1 | The Live tab shows a scrolling edit log with +/- bytes. | TODO (Live tab, PR 8): Pilot test and walkthrough L2 |
+| 1 | The Live tab shows a scrolling edit log with +/- bytes. | TODO (Live tab): Pilot test and walkthrough L2 |
 | 2 | An edits-per-minute sparkline, top-edited articles (15 minutes) and the bot vs human ratio show beside the log. | TODO: walkthrough L3 |
 | 3 | Live filters: wiki, hide bots, articles only, minimum byte change. | TODO: walkthrough L4 |
 | 4 | The Reading tab ranks articles by spike (today's views over the 30-day median). | TODO (Reading tab): walkthrough R2 |
