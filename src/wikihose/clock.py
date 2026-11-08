@@ -5,7 +5,7 @@ tests and replays never wait on the wall clock. No other module calls ``time.sle
 positive delay; a test enforces that.
 """
 
-# Shaped after eyewall (C:\eyewall) clock.py at commit 3b4b552767aec9e87e3989c4f64f3f31639398f7.
+# Shaped after eyewall (https://github.com/WPTK/eyewall) clock.py at commit 3b4b552767aec9e87e3989c4f64f3f31639398f7.
 
 from __future__ import annotations
 

@@ -166,6 +166,12 @@ def parse_event(raw: str) -> tuple[Edit | PageMove | None, bool]:
         data = json.loads(raw)
         if not isinstance(data, dict):
             raise _Malformed
+        meta = data.get("meta")
+        # Canary events are artificial events Wikimedia mixes into the public streams to tell a broken stream from an
+        # empty one. Its EventStreams page (wikitech.wikimedia.org/wiki/Event_Platform/EventStreams, "Canary Events")
+        # says to discard every event whose meta.domain is "canary".
+        if isinstance(meta, dict) and meta.get("domain") == "canary":
+            return None, True
         kind = data.get("type")
         if not isinstance(kind, str):
             raise _Malformed

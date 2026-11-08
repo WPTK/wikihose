@@ -6,8 +6,8 @@ makes every caller wait. ``Client`` is the only thing that talks to the network;
 ``FetchError`` a screen can describe in plain words. All waiting goes through the injected clock.
 """
 
-# Patterns (user_agent, retry_after, the polite request budget idea) adapted from earthwave (C:\earthwave) net.py at
-# commit 2b4fe0a49844619ae217f6eec02061b6bc2d5830.
+# Patterns (user_agent, retry_after, the polite request budget idea) adapted from earthwave
+# (https://github.com/WPTK/earthwave) net.py at commit 2b4fe0a49844619ae217f6eec02061b6bc2d5830.
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import asyncio
 import logging
 import sqlite3
 from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, closing
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -29,7 +29,7 @@ import stamina
 
 from wikihose import __version__
 from wikihose.clock import Clock
-from wikihose.sse import SseEvent, parse_sse
+from wikihose.sse import SseEvent, parse_sse, valid_event_id
 
 log = logging.getLogger(__name__)
 
@@ -164,10 +164,18 @@ class Client:
                 transport = _open_cache(cache_dir)
             except Exception as exc:  # an unusable cache costs the cache, not the app
                 log.warning("http cache unavailable (%s: %s); continuing without it", type(exc).__name__, exc)
+        headers = {"User-Agent": user_agent(contact), "Accept-Encoding": "gzip"}
         self._http = httpx.AsyncClient(
             transport=transport,
-            headers={"User-Agent": user_agent(contact), "Accept-Encoding": "gzip"},
+            headers=headers,
             timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=30.0),
+            follow_redirects=True,
+        )
+        # The event stream gets its own client with no cache: hishel 2.0 ignores a request's no-store, so a stream sent
+        # through the caching transport would be written into the cache database.
+        self._stream_http = httpx.AsyncClient(
+            headers=headers,
+            timeout=httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=30.0),
             follow_redirects=True,
         )
 
@@ -209,18 +217,21 @@ class Client:
         self._budget.pause_until(self._clock.monotonic() + wait)
         return wait
 
-    async def stream(self, url: str, last_event_id: str | None = None) -> AsyncIterator[SseEvent]:
+    async def stream(self, url: str, last_event_id: str | None = None) -> AsyncGenerator[SseEvent]:
         """One long-lived GET that yields server-sent events until the server or the network ends it.
 
         The connect counts once against the budget; the connection holds no in-flight place while it streams.
         """
-        headers = {"Accept": "text/event-stream", "Cache-Control": "no-store"}
-        if last_event_id:
+        headers = {"Accept": "text/event-stream"}
+        if last_event_id and valid_event_id(last_event_id):
             headers["Last-Event-ID"] = last_event_id
-        request = self._http.build_request("GET", url, headers=headers, timeout=httpx.Timeout(10.0, read=60.0))
+        try:
+            request = self._stream_http.build_request("GET", url, headers=headers)
+        except (ValueError, TypeError, httpx.InvalidURL) as exc:
+            raise FetchError("bad_data", f"could not build the request: {exc}") from exc
         try:
             async with self._budget.slot():
-                response = await self._http.send(request, stream=True)
+                response = await self._stream_http.send(request, stream=True)
         except httpx.HTTPError as exc:
             raise FetchError("down", f"{type(exc).__name__}: {exc}") from exc
         try:
@@ -232,7 +243,10 @@ class Client:
                 raise FetchError("down", f"HTTP {status}")
             if status >= 400:
                 raise FetchError("bad_data", f"HTTP {status}")
-            async for event in parse_sse(response.aiter_lines()):
+            kind = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+            if kind != "text/event-stream":
+                raise FetchError("bad_data", f"expected text/event-stream, got {kind or 'no content type'}")
+            async for event in parse_sse(response.aiter_text()):
                 yield event
         except httpx.HTTPError as exc:
             raise FetchError("down", f"{type(exc).__name__}: {exc}") from exc
@@ -240,4 +254,5 @@ class Client:
             await response.aclose()
 
     async def aclose(self) -> None:
+        await self._stream_http.aclose()
         await self._http.aclose()

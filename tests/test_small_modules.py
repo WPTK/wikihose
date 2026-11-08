@@ -232,3 +232,39 @@ def test_store_refuses_a_newer_database(tmp_path: Path) -> None:
 
 def test_the_sleep_rule_has_something_to_find() -> None:
     assert re.search(r"asyncio\.sleep\(", (SRC / "wikihose" / "clock.py").read_text(encoding="utf-8"))
+
+
+def test_config_wiki_must_match_the_whole_value(tmp_path: Path) -> None:
+    path = tmp_path / "c.toml"
+    path.write_text('wiki = "enwiki\\n"\n', encoding="utf-8")  # a TOML escape: the value ends in a newline
+    config, warnings = load_config(path)
+    assert config.wiki == "enwiki" and len(warnings) == 1  # the default; the newline form is refused
+
+
+@pytest.mark.parametrize("contact", ["caf\\u00e9@x", "a\\r\\nX-Evil: 1", "tab\\there"])
+def test_config_contact_must_be_printable_ascii(tmp_path: Path, contact: str) -> None:
+    path = tmp_path / "c.toml"
+    path.write_text(f'contact = "{contact}"\n', encoding="utf-8")
+    config, warnings = load_config(path)
+    assert config.contact == "" and len(warnings) == 1
+
+
+def test_config_with_invalid_utf8_gives_defaults_and_a_warning(tmp_path: Path) -> None:
+    path = tmp_path / "c.toml"
+    path.write_bytes(b'contact = "\xff\xfe"\n')
+    config, warnings = load_config(path)
+    assert config == Config() and len(warnings) == 1
+
+
+def test_a_failing_migration_step_changes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from wikihose import store
+
+    path = tmp_path / "broken.db"
+    monkeypatch.setattr(store, "MIGRATIONS", [["CREATE TABLE a (x)", "CREATE TABLE a (y)"]])
+    monkeypatch.setattr(store, "SCHEMA_VERSION", 1)
+    with pytest.raises(sqlite3.OperationalError):
+        Store(path)
+    db = sqlite3.connect(path)
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 0
+    assert db.execute("SELECT count(*) FROM sqlite_master WHERE type = 'table'").fetchone()[0] == 0
+    db.close()

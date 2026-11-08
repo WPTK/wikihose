@@ -17,7 +17,7 @@ import tomli_w
 
 from wikihose.paths import config_dir
 
-WIKI_PATTERN = re.compile(r"^[a-z_]+wiki$")
+WIKI_PATTERN = re.compile(r"[a-z_]+wiki")
 
 
 @dataclass(frozen=True)
@@ -36,12 +36,14 @@ def default_config_path() -> Path:
 
 def _valid(name: str, value: Any) -> bool:
     if name == "wiki":
-        return isinstance(value, str) and WIKI_PATTERN.match(value) is not None
+        return isinstance(value, str) and WIKI_PATTERN.fullmatch(value) is not None
     if name == "min_bytes":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
     if name in ("hide_bots", "articles_only"):
         return isinstance(value, bool)
-    return isinstance(value, str)  # contact, theme
+    if name == "contact":  # it goes into a request header, so no control characters and nothing outside ASCII
+        return isinstance(value, str) and value.isascii() and value.isprintable()
+    return isinstance(value, str)  # theme
 
 
 def load_config(path: Path | None) -> tuple[Config, list[str]]:
@@ -51,7 +53,7 @@ def load_config(path: Path | None) -> tuple[Config, list[str]]:
     try:
         with path.open("rb") as handle:
             raw = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, ValueError) as exc:  # TOMLDecodeError and UnicodeDecodeError are ValueErrors
         return Config(), [f"config: could not read {path} ({exc}); using defaults"]
     known = {f.name for f in fields(Config)}
     warnings: list[str] = []
