@@ -166,6 +166,8 @@ class ReadingSource(Protocol):
 
     async def summary(self, title: str) -> Summary | None: ...
 
+    async def spike_of(self, title: str) -> SpikeRow | None: ...
+
 
 class ReadingData:
     """Loads and ranks the Reading tab's rows for one wiki."""
@@ -285,6 +287,27 @@ class ReadingData:
             self._histories[key] = None if payload is None else parse_history(payload, first)
         cached = self._histories[key]
         return None if cached is None else list(cached)
+
+    async def spike_of(self, title: str) -> SpikeRow | None:
+        """One article's spike on the newest day, from its own 30-day history (the Convergence surge trigger).
+
+        ``title`` may have spaces or underscores. None when there is no top list yet or the API has no data for it.
+        """
+        newest = await self.newest_day()
+        if newest is None:
+            return None
+        today, todays = newest
+        name = title.replace(" ", "_")
+        if not _encodable(name):
+            return None
+        series = await self.history(name, today - timedelta(days=DAYS - 1))
+        if series is None:
+            return None
+        if name in todays:
+            series[-1] = todays[name]  # the top list is the figure for the newest day
+        views = series[-1]
+        baseline = float(statistics.median(series[:-1]))
+        return SpikeRow(name, views, baseline, spike_multiple(views, baseline), tuple(series), True)
 
     async def summary(self, title: str) -> Summary | None:
         if title not in self._summaries:

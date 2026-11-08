@@ -11,6 +11,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.message import Message
 from textual.timer import Timer
 from textual.widgets import DataTable, Static
 
@@ -64,6 +65,14 @@ class ReadingTab(Vertical):
     ReadingTab #reading-detail { height: 7; padding: 0 1; border-top: solid $primary 40%; overflow-y: hidden; }
     """
 
+    class Loaded(Message):
+        """A ranking for ``wiki`` finished loading (it may be empty). Convergence listens for it."""
+
+        def __init__(self, wiki: str, rows: list[SpikeRow]) -> None:
+            super().__init__()
+            self.wiki = wiki
+            self.rows = rows
+
     def __init__(self, factory: Factory, wiki: str) -> None:
         super().__init__(id="reading-tab")
         self._factory = factory
@@ -90,9 +99,17 @@ class ReadingTab(Vertical):
 
     def on_show(self) -> None:
         """Load the first time the tab is opened, so the Live tab's start-up does not wait on 80 requests."""
+        self.start()
+
+    def start(self) -> None:
+        """Load once: when this tab or the Convergence tab is first opened."""
         if not self._started:
             self._started = True
             self.load()
+
+    @property
+    def source(self) -> ReadingSource | None:
+        return self._source
 
     def on_resize(self, event: events.Resize) -> None:
         self._draw()
@@ -126,6 +143,7 @@ class ReadingTab(Vertical):
         self._rows = rows
         self._draw()
         self._say("")
+        self.post_message(self.Loaded(self.wiki, rows))
 
     def _stop_retry(self) -> None:
         if self._retry is not None:
