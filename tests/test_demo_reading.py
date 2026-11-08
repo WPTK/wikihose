@@ -20,7 +20,7 @@ from test_reading_tab import settle_reading, table
 from wikihose.cli import demo_reading_factory, main
 from wikihose.clock import VirtualClock
 from wikihose.demo_reading import DEMO_READING, FORMAT, VERSION, DemoReading, read_demo_reading
-from wikihose.reading import MIN_VIEWS
+from wikihose.reading import MIN_VIEWS, rank
 from wikihose.sources.recording import demo_recording
 from wikihose.sources.replay import ReplaySource
 
@@ -36,7 +36,8 @@ async def test_the_snapshot_is_a_full_ranking() -> None:
     rows = await source.load()
     assert source.day is not None
     assert len(rows) >= 25
-    assert rows == sorted(rows, key=lambda r: (-r.multiple, r.title))
+    assert rows == rank(rows)
+    assert not rows[0].new and rows[-1].new  # #26: the usual-0 pages rank last, not first
     assert all(r.views >= MIN_VIEWS for r in rows)
     assert sum(r.exact for r in rows) >= 25  # the top candidates have their own history
     assert await source.summary(rows[0].title) is not None
@@ -72,7 +73,7 @@ async def test_a_damaged_snapshot_gives_an_empty_ranking(payload: Any) -> None:
 async def test_bad_rows_and_summaries_are_skipped() -> None:
     good = {"title": "Good", "views": 9000, "baseline": 10.0, "multiple": 900.0, "series": [1, 2], "exact": True}
     rows: list[Any] = [good, {"title": "", "views": 1}, {**good, "views": -1}, {**good, "series": ["x"]}, 7]
-    rows += [{**good, "views": True}, {**good, "series": [True]}, {**good, "multiple": float("nan")}]
+    rows += [{**good, "views": True}, {**good, "series": [True]}, {**good, "baseline": float("nan")}]
     rows += [{**good, "baseline": float("inf")}]
     payload = {"format": FORMAT, "version": VERSION, "day": "2026-11-07", "rows": rows}
     payload["summaries"] = {"Good": {"title": "Good", "description": "", "extract": "Text."}, "Bad": {"title": 1}}

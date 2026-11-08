@@ -193,8 +193,10 @@ class WikihoseApp(App[None]):
         Binding("W", "watch_typed", "Type page", show=False, tooltip="Type a page title or paste a link to watch"),
         Binding("question_mark", "help", "Help", key_display="?", tooltip="Show this list of keys"),
         Binding("q", "quit", "Quit", tooltip="Quit wikihose"),
-        # Replay keys: only active when the source is a replay (see check_action).
-        Binding("space", "replay_pause", "Play", key_display="space", tooltip="Pause or resume the replay"),
+        # Replay keys: only active when the source is a replay (see check_action). space has one binding per state,
+        # so the footer names what it will do: Pause while playing, Play while paused.
+        Binding("space", "replay_pause", "Pause", key_display="space", tooltip="Pause or resume the replay"),
+        Binding("space", "replay_play", "Play", key_display="space", tooltip="Pause or resume the replay"),
         # + and - stay out of the footer so the replay footer fits 80 columns; ? help lists them and the top bar
         # shows the speed.
         Binding(
@@ -496,6 +498,9 @@ class WikihoseApp(App[None]):
         return isinstance(self.source, ReplaySource)
 
     def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
+        if action in ("replay_pause", "replay_play"):
+            replay = self._replay()
+            return replay is not None and replay.paused == (action == "replay_play")
         if action.startswith("replay_"):
             return self.replaying
         return True
@@ -513,11 +518,17 @@ class WikihoseApp(App[None]):
 
     def action_replay_pause(self) -> None:
         if (replay := self._replay()) is not None:
-            if replay.paused:
-                replay.resume()
-            else:
-                replay.pause()
-            self._on_main(self._main.refresh_top_bar)
+            replay.pause()
+            self._replay_state_changed()
+
+    def action_replay_play(self) -> None:
+        if (replay := self._replay()) is not None:
+            replay.resume()
+            self._replay_state_changed()
+
+    def _replay_state_changed(self) -> None:
+        self.refresh_bindings()  # the space key's footer label follows the state
+        self._on_main(self._main.refresh_top_bar)
 
     def action_replay_faster(self) -> None:
         if (replay := self._replay()) is not None:

@@ -121,7 +121,8 @@ class LiveTab(Vertical):
         Binding("m", "cycle_size", "Size", tooltip="Cycle the smallest change shown: any, 100, 1,000 bytes"),
         Binding("i", "change_wiki", "Wiki", tooltip="Type another wiki to watch, such as dewiki"),
         Binding("d", "show_diff", "Diff", tooltip="Show what the selected edit changed"),
-        Binding("p", "toggle_pause", "Pause", tooltip="Pause or resume the log (the numbers keep counting)"),
+        # "Hold", not "Pause": in a replay, space is the Pause key (and Hold keeps that footer inside 80 columns)
+        Binding("p", "toggle_pause", "Hold", tooltip="Hold the log still or let it run (the numbers keep counting)"),
     ]
 
     DEFAULT_CSS = """

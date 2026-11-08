@@ -125,7 +125,7 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
   `m` minimum size. (auto for `a` and `b`)
 - L5. Select a row (arrow keys, then click): `w` adds the article to the Watchlist; Enter opens the edit's detail with
   a link; `d` opens its diff.
-- L6. `p` pauses the log; it keeps its place while the numbers keep counting. In a replay, space, `+`, `-` and `]`
+- L6. `p` (Hold) pauses the log; it keeps its place while the numbers keep counting. In a replay, space, `+`, `-` and `]`
   pause, speed and skip. (auto for space and `+`)
 
 ### R. Reading tab

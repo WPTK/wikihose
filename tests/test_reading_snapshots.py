@@ -34,7 +34,6 @@ def rows() -> list[SpikeRow]:
             t,
             785245 // (n + 1),
             3200.0 + n * 10,
-            785245 / (n + 1) / (3200 + n * 10),
             SERIES if n % 3 else (),
             n % 3 != 0,
         )

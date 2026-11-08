@@ -63,7 +63,6 @@ def snapshot(day: str, rows: list[SpikeRow], summaries: dict[str, Any]) -> dict[
                 "title": r.title,
                 "views": r.views,
                 "baseline": r.baseline,
-                "multiple": r.multiple,
                 "series": list(r.series),
                 "exact": r.exact,
             }
