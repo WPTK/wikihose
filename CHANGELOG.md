@@ -22,3 +22,8 @@ _Known issue: the Live log can show rows slightly out of time order, as the feed
 - ✨ Add a 30-day pageview sparkline to each watched page (#21)
 - ✨ Add the Convergence tab: articles hot in both Live and Reading, ranked by edits by people times the reading spike, with a surge trigger that fetches a busy page's own reading history (#22)
 - ✨ Publish each release to PyPI and as a single Windows exe, with `SHA256SUMS` and build attestations (#11)
+
+### Fixed
+
+- 🐛 Show `new` instead of a huge multiple for a page read under 100 times a day before; such pages rank last in Reading and are never hot in Convergence (#26, #34)
+- 🐛 Name what space will do in a replay (`space Pause` while playing, `space Play` while paused), and call the Live log's `p` key `Hold` so it is not a second Pause (#34)

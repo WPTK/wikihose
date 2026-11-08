@@ -13,7 +13,7 @@ import math
 from datetime import date
 from typing import Any
 
-from wikihose.reading import MAX_VIEWS, Progress, SpikeRow, Summary
+from wikihose.reading import MAX_VIEWS, Progress, SpikeRow, Summary, rank
 
 DEMO_READING = "demo-reading-enwiki.json.gz"
 FORMAT = "wikihose-reading-snapshot"
@@ -33,13 +33,13 @@ def _row(item: Any) -> SpikeRow | None:
     """One ranking row from the file, or None when it is not one: the file is package data, but read it defensively."""
     if not isinstance(item, dict):
         return None
-    title, views, baseline, multiple = item.get("title"), item.get("views"), item.get("baseline"), item.get("multiple")
+    title, views, baseline = item.get("title"), item.get("views"), item.get("baseline")
     series, exact = item.get("series", []), item.get("exact")
-    if not (isinstance(title, str) and title and _count(views) and _number(baseline) and _number(multiple)):
+    if not (isinstance(title, str) and title and _count(views) and _number(baseline)):
         return None
     if not isinstance(series, list) or not all(_count(v) for v in series) or not isinstance(exact, bool):
         return None
-    return SpikeRow(title, int(views), float(baseline), float(multiple), tuple(series), exact)  # type: ignore[arg-type]
+    return SpikeRow(title, int(views), float(baseline), tuple(series), exact)  # type: ignore[arg-type]
 
 
 class DemoReading:
@@ -52,7 +52,9 @@ class DemoReading:
         except (TypeError, ValueError):
             self._day = None
         rows = payload.get("rows")
-        self._rows = [r for r in (_row(item) for item in (rows if isinstance(rows, list) else [])) if r is not None]
+        self._rows = rank(
+            [r for r in (_row(item) for item in (rows if isinstance(rows, list) else [])) if r is not None]
+        )
         self._summaries: dict[str, Summary] = {}
         summaries = payload.get("summaries")
         for title, item in (summaries if isinstance(summaries, dict) else {}).items():

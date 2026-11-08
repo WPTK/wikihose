@@ -27,6 +27,7 @@ from wikihose.net import Client, FetchError
 
 DAYS = 30  # the newest day plus the 29 before it
 MIN_VIEWS = 5000  # a page needs this many views on the newest day to count as a spike (owner's choice)
+MIN_USUAL = 100  # a page read less than this on a usual day is new: it has no spike multiple and ranks last
 EXACT_COUNT = 50  # per-article history is fetched for this many candidates
 MAX_VIEWS = 10**12  # larger than any real count; keeps the median arithmetic in float range
 MIN_LISTS = 10  # fewer earlier lists than this and no baseline is trustworthy
@@ -40,9 +41,18 @@ class SpikeRow:
     title: str  # underscores, as the API gives it
     views: int  # on the newest day
     baseline: float  # 30-day median (an upper bound unless ``exact``)
-    multiple: float  # views / baseline (a lower bound unless ``exact``)
     series: tuple[int, ...]  # daily views, oldest first, ending with ``views``; empty if unknown
     exact: bool  # True when the baseline comes from the article's own history
+
+    @property
+    def new(self) -> bool:
+        """Too little reading history for a multiple: the usual is below ``MIN_USUAL``."""
+        return is_new(self.baseline)
+
+    @property
+    def multiple(self) -> float:
+        """Views / baseline (a lower bound unless ``exact``); 0 for a new page."""
+        return spike_multiple(self.views, self.baseline)
 
     @property
     def display_title(self) -> str:
@@ -142,9 +152,22 @@ def bounded_baseline(title: str, earlier: list[Mapping[str, int]]) -> float:
     return float(statistics.median(day.get(title, floor_of(day)) for day in earlier))
 
 
+def is_new(baseline: float) -> bool:
+    return baseline < MIN_USUAL
+
+
 def spike_multiple(views: int, baseline: float) -> float:
-    """Views divided by the baseline; a baseline below 1 counts as 1 so a brand-new page does not divide by zero."""
-    return views / max(baseline, 1.0)
+    """Views divided by the baseline, or 0 for a new page (usual below ``MIN_USUAL``).
+
+    A page with almost no history would otherwise get a multiple close to its views (52,699x for a usual of 0) and top
+    every ranking. A 0 ranks it last in Reading and keeps it below ``MIN_SPIKE`` in Convergence.
+    """
+    return 0.0 if is_new(baseline) else views / baseline
+
+
+def rank(rows: list[SpikeRow]) -> list[SpikeRow]:
+    """Best first: the highest multiple, then the most-read new page, then by title."""
+    return sorted(rows, key=lambda r: (-r.multiple, -r.views if r.new else 0, r.title))
 
 
 def parse_summary(payload: Any) -> Summary | None:
@@ -256,9 +279,9 @@ class ReadingData:
         candidates.sort(key=lambda c: (-c[0], c[1]))
         total = done + min(len(candidates), self._exact_count)
         rows: list[SpikeRow] = []
-        for position, (multiple, title, views) in enumerate(candidates):
+        for position, (_, title, views) in enumerate(candidates):
             if position >= self._exact_count:
-                rows.append(SpikeRow(title, views, bounded_baseline(title, earlier), multiple, (), False))
+                rows.append(SpikeRow(title, views, bounded_baseline(title, earlier), (), False))
                 continue
             try:
                 series = await self.history(title, first)
@@ -270,13 +293,12 @@ class ReadingData:
             if progress:
                 progress(done, total)
             if series is None:
-                rows.append(SpikeRow(title, views, bounded_baseline(title, earlier), multiple, (), False))
+                rows.append(SpikeRow(title, views, bounded_baseline(title, earlier), (), False))
                 continue
             series[-1] = views  # the top list is the figure for the newest day
             baseline = float(statistics.median(series[:-1]))
-            rows.append(SpikeRow(title, views, baseline, spike_multiple(views, baseline), tuple(series), True))
-        rows.sort(key=lambda r: (-r.multiple, r.title))
-        return rows
+            rows.append(SpikeRow(title, views, baseline, tuple(series), True))
+        return rank(rows)
 
     async def history(self, title: str, first: date) -> list[int] | None:
         """30 daily views starting at ``first`` for one article, or None when the API has nothing for it."""
@@ -308,7 +330,7 @@ class ReadingData:
             series[-1] = todays[name]  # the top list is the figure for the newest day
         views = series[-1]
         baseline = float(statistics.median(series[:-1]))
-        return SpikeRow(name, views, baseline, spike_multiple(views, baseline), tuple(series), True)
+        return SpikeRow(name, views, baseline, tuple(series), True)
 
     async def summary(self, title: str) -> Summary | None:
         if title not in self._summaries:

@@ -125,7 +125,7 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
   `m` minimum size. (auto for `a` and `b`)
 - L5. Select a row (arrow keys, then click): `w` adds the article to the Watchlist; Enter opens the edit's detail with
   a link; `d` opens its diff.
-- L6. `p` pauses the log; it keeps its place while the numbers keep counting. In a replay, space, `+`, `-` and `]`
+- L6. `p` (Hold) pauses the log; it keeps its place while the numbers keep counting. In a replay, space, `+`, `-` and `]`
   pause, speed and skip. (auto for space and `+`)
 
 ### R. Reading tab
@@ -168,7 +168,7 @@ Each step says what to do and what should happen. Do the keyboard pass first, th
 
 | Date | Build (commit, exe SHA-256) | Tester | P0 open | P1 open | P2 open | P3 open | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch at `175ae87`, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 0 | 3 | Pass for the automated part |
+| 2026-11-08 | `21cf62a`, `38cb4a70711d398d9dde3ecd4b074c271c96056c21cd0e5615d87ae01782f0b5`; recheck after the fixes below on the release-candidate branch at `175ae87`, `59c0579dcb811870283d3f7547f8bc6541dad9ff3abaf938229e1c2c00f6825d` | Session 4 (automated run and captures; the by-hand walkthroughs in Windows Terminal are still to do) | 0 | 0 | 0 | 2 | Pass for the automated part |
 
 Findings from that run, and where each went:
 
@@ -177,7 +177,7 @@ Findings from that run, and where each went:
 | At 80x24 the demo's Live footer was cut at `+ Faste`; Slower and Skip could not be seen or clicked | P2 | Fixed in the release-candidate PR: `+` and `-` are in `?` help only (the top bar shows the speed); `test_the_footer_fits_80_columns_on_every_tab` |
 | `scripts/capture_demo.py --tab 2` and `--tab 5` showed "needs a live connection" instead of the demo's Reading numbers | P2 | Fixed in the release-candidate PR |
 | The `?` journey could read the help screen before all of it was drawn (one failure in three exe runs) | P3 | Fixed in the release-candidate PR: it waits for every line it checks |
-| A page with a usual of 0 tops the Reading ranking with a five-digit spike | P3 | #26 |
+| A page with a usual of 0 tops the Reading ranking with a five-digit spike | P3 | Fixed for #26 in #34: a usual below 100 shows `new` and ranks last; `test_the_snapshot_is_a_full_ranking` |
 | Live log rows are in arrival order, not time order | P3 | #27 |
 | Reading at 240 columns spreads its numbers far from the titles; a blank cell in one sparkline | P3 | #28 |
 | A plain `--replay` footer (with `i Wiki`) is cut at 80 columns, so `] Skip` cannot be seen or clicked | P2 | Fixed for #29: `i` is off in every replay, which plays in the wiki its recording holds (`--wiki` picks one for a recording of every wiki); `test_the_footer_fits_80_columns_on_every_tab[replay]` |

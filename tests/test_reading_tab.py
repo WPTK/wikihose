@@ -32,8 +32,7 @@ SERIES = tuple([100] * 29 + [9000])
 
 def make_rows(count: int = 60) -> list[SpikeRow]:
     return [
-        SpikeRow(f"Page_{n}", 90000 - n * 100, 100.0, (90000 - n * 100) / 100, SERIES if n % 2 == 0 else (), n % 2 == 0)
-        for n in range(count)
+        SpikeRow(f"Page_{n}", 90000 - n * 100, 100.0, SERIES if n % 2 == 0 else (), n % 2 == 0) for n in range(count)
     ]
 
 
@@ -99,10 +98,17 @@ def test_spark_scales_to_the_largest_and_merges_days() -> None:
 
 
 def test_rough_figures_carry_a_tilde() -> None:
-    exact = SpikeRow("A", 5000, 10.0, 500.0, SERIES, True)
-    rough = SpikeRow("A", 5000, 10.0, 500.0, (), False)
-    assert (spike_text(exact), usual_text(exact)) == ("500x", "10")
-    assert (spike_text(rough), usual_text(rough)) == ("~500x", "~10")
+    exact = SpikeRow("A", 50000, 100.0, SERIES, True)
+    rough = SpikeRow("A", 50000, 100.0, (), False)
+    assert (spike_text(exact), usual_text(exact)) == ("500x", "100")
+    assert (spike_text(rough), usual_text(rough)) == ("~500x", "~100")
+
+
+def test_a_page_with_too_little_history_reads_new_not_a_huge_multiple() -> None:
+    row = SpikeRow("Vali_Chandrasekaran", 52699, 0.0, SERIES, True)
+    assert row.new and row.multiple == 0
+    assert (spike_text(row), usual_text(row)) == ("new", "0")
+    assert not SpikeRow("A", 52699, 100.0, SERIES, True).new  # a usual of exactly MIN_USUAL has a multiple
 
 
 @pytest.mark.parametrize("width", [80, 100, 120, 200])
@@ -389,7 +395,7 @@ async def test_a_long_summary_is_cut_with_an_ellipsis_inside_the_pane(clock: Vir
 
 
 async def test_wide_numbers_fit_their_columns(clock: VirtualClock) -> None:
-    big = SpikeRow("Big", 10_000_000, 100.0, 100_000.0, (), False)
+    big = SpikeRow("Big", 10_000_000, 100.0, (), False)
     app = reading_app(clock, FakeReading([big]))
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.press("2")

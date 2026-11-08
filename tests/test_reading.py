@@ -15,6 +15,7 @@ from wikihose.clock import VirtualClock
 from wikihose.net import Client
 from wikihose.reading import (
     DAYS,
+    MIN_USUAL,
     ReadingData,
     SpikeRow,
     bounded_baseline,
@@ -23,6 +24,7 @@ from wikihose.reading import (
     parse_summary,
     parse_top,
     project_of,
+    rank,
     spike_multiple,
 )
 
@@ -84,9 +86,14 @@ def test_bounded_baseline_counts_a_missing_day_at_the_floor() -> None:
     assert bounded_baseline("A", []) == 0.0
 
 
-def test_spike_multiple_never_divides_by_zero() -> None:
-    assert spike_multiple(50, 0.0) == 50
-    assert spike_multiple(300, 100.0) == 3.0
+def test_a_page_read_less_than_min_usual_has_no_multiple() -> None:
+    # #26: a usual of 0 used to count as 1, so a new page got a multiple equal to its views and topped the ranking
+    assert spike_multiple(52699, 0.0) == 0
+    assert spike_multiple(52699, MIN_USUAL - 1) == 0
+    assert spike_multiple(300, MIN_USUAL) == 3.0
+    rows = [SpikeRow("New", 90000, 0.0, (), True), SpikeRow("Newer", 9000, 5.0, (), True)]
+    rows += [SpikeRow("Real", 6000, 2000.0, (), True)]
+    assert [r.title for r in rank(rows)] == ["Real", "New", "Newer"]  # new pages last, the most-read first
 
 
 def test_parse_summary() -> None:
@@ -136,10 +143,12 @@ async def test_load_ranks_spikes_and_filters(client: Client, clock: VirtualClock
     seen: list[tuple[int, int]] = []
     rows = await data.load(lambda done, total: seen.append((done, total)))
     titles = [r.title for r in rows]
-    assert titles == ["Spiky", "Ramayana:_Part_1", "Steady"]  # Special:Search, Main_Page and the tiny page are gone
-    spiky, ramayana, steady = rows
+    # Special:Search, Main_Page and the tiny page are gone; Spiky was read too little before to have a multiple, so it
+    # is new and ranks last instead of first with 90,000x (#26)
+    assert titles == ["Ramayana:_Part_1", "Steady", "Spiky"]
+    ramayana, steady, spiky = rows
     assert spiky.exact and spiky.baseline == 0.0 + sorted([200] * 14 + [0] * 15)[14] and spiky.views == 90000
-    assert spiky.multiple == 90000  # a median below 1 counts as 1
+    assert spiky.new and spiky.multiple == 0
     assert len(spiky.series) == DAYS and spiky.series[-1] == 90000 and spiky.series[1] == 0
     assert not ramayana.exact and ramayana.series == () and ramayana.baseline == 20000  # 404: keeps the bound
     assert steady.exact and steady.multiple == 1.0
@@ -178,7 +187,7 @@ async def test_summary_is_fetched_once(client: Client, clock: VirtualClock) -> N
 
 
 def test_spike_row_display_title() -> None:
-    assert SpikeRow("Ada_Lovelace", 1, 1.0, 1.0, (), False).display_title == "Ada Lovelace"
+    assert SpikeRow("Ada_Lovelace", 1, 1.0, (), False).display_title == "Ada Lovelace"
 
 
 @respx.mock

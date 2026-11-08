@@ -340,8 +340,10 @@ async def test_replay_keys_pause_speed_and_skip(clock: VirtualClock) -> None:
             before = source.moment()
             await pilot.press("right_square_bracket")
             assert (source.moment() - before).total_seconds() == 60
+            assert "space Play" in footer_text(await footer_keys(pilot, app, needing="Play"))
             await pilot.press("space")
             assert not source.paused
+            assert "space Pause" in footer_text(await footer_keys(pilot, app, needing="Pause"))
             await wait_for_stream(app, pilot)  # it plays on to the end, since the skip passed the last event
             assert source.moment() >= source.recorded_start
 
@@ -364,15 +366,15 @@ async def test_footer_shows_the_replay_keys_only_in_a_replay(clock: VirtualClock
         async with replay.run_test(size=(140, 30)) as pilot:
             await pilot.pause()
             text = footer_text(await footer_keys(pilot, replay, needing="Skip"))
-            for label in ("Play", "Skip"):
-                assert label in text
+            assert "space Pause" in text and "Play" not in text  # playing: space names what it will do
+            assert "Skip" in text
             for label in ("Faster", "Slower"):  # in ? help only, so the footer fits 80 columns
                 assert label not in text
     live = app_with(clock)
     async with live.run_test(size=(140, 30)) as pilot:
         await pilot.pause()
         text = footer_text(await footer_keys(pilot, live, needing="Quit"))
-        for label in ("Bots", "Articles", "Size", "Wiki", "Pause", "Watch", "Help", "Quit"):
+        for label in ("Bots", "Articles", "Size", "Wiki", "Hold", "Watch", "Help", "Quit"):
             assert label in text
         for label in ("Play", "Faster", "Slower", "Skip"):
             assert label not in text
@@ -659,7 +661,7 @@ async def click_footer(pilot, app, label: str) -> None:
     await pilot.pause()
 
 
-@pytest.mark.parametrize("label", ["Bots", "Articles", "Size", "Wiki", "Pause", "Watch", "Help", "Quit"])
+@pytest.mark.parametrize("label", ["Bots", "Articles", "Size", "Wiki", "Hold", "Watch", "Help", "Quit"])
 async def test_clicking_each_live_footer_key_does_what_its_key_does(clock: VirtualClock, label: str) -> None:
     app = app_with(clock)
     async with app.run_test(size=(140, 30)) as pilot:
@@ -674,7 +676,7 @@ async def test_clicking_each_live_footer_key_does_what_its_key_does(clock: Virtu
                 assert after[1] != before[1]
             case "Size":
                 assert after[2] != before[2]
-            case "Pause":
+            case "Hold":
                 assert after[3] != before[3]
             case "Wiki":
                 assert isinstance(app.screen, WikiPrompt)
@@ -711,11 +713,12 @@ async def test_i_does_nothing_in_a_replay(clock: VirtualClock) -> None:
             assert not isinstance(app.screen, WikiPrompt)
 
 
-@pytest.mark.parametrize("label", ["Play", "Skip"])
+@pytest.mark.parametrize("label", ["Play", "Pause", "Skip"])
 async def test_clicking_each_replay_footer_key_does_what_its_key_does(clock: VirtualClock, label: str) -> None:
     with sample_recording() as path:
         source = ReplaySource(path, clock)
-        source.pause()
+        if label != "Pause":
+            source.pause()
         app = make_app(source, clock)
         async with app.run_test(size=(140, 30)) as pilot:
             before = source.moment()
@@ -723,6 +726,8 @@ async def test_clicking_each_replay_footer_key_does_what_its_key_does(clock: Vir
             match label:
                 case "Play":
                     assert not source.paused
+                case "Pause":
+                    assert source.paused
                 case "Faster":
                     assert source.speed == 2
                 case "Slower":

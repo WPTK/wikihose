@@ -29,7 +29,9 @@ Factory = Callable[[str], ReadingSource | None]
 
 
 def spike_text(row: SpikeRow) -> str:
-    """``1,234x``; a tilde marks a rough figure (the page's own history was not used)."""
+    """``1,234x``; a tilde marks a rough figure (the page's own history was not used). ``new``: too little history."""
+    if row.new:
+        return "new"
     return f"{'' if row.exact else '~'}{row.multiple:,.0f}x"
 
 

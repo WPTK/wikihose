@@ -11,7 +11,9 @@ This file is the target. Session 1 starts with a design pass that may change the
 1. **Live.** A scrolling edit log with +/- bytes, an edits-per-minute sparkline, top-edited articles over the last 15
    minutes, and the bot vs human ratio. Filters: wiki, hide bots, articles only, minimum byte change.
 2. **Reading.** Daily spike rankings. Spike = today's views divided by the article's 30-day median. Columns: article,
-   views, baseline, spike multiple, 30-day sparkline. A detail pane shows the article summary.
+   views, baseline, spike multiple, 30-day sparkline. A detail pane shows the article summary. A page whose median is
+   below 100 views a day (`MIN_USUAL` in `src/wikihose/reading.py`) has too little history for a multiple: it shows
+   `new`, ranks after every page with a multiple, and is never hot in Convergence (#26).
 3. **Watchlist.** Pages you track.
    - Add one with `w` on any article row in any tab, or by typing a title or pasting a Wikipedia URL.
    - While the app runs, match live edits against the list with no extra requests, highlight matches and badge the tab.

@@ -16,7 +16,7 @@ from textual.widgets import Static
 from wikihose.clock import VirtualClock
 from wikihose.convergence import LABEL, MIN_SPIKE, MIN_SURGE_VIEWS, SURGE_EDITS, WINDOW, Convergence
 from wikihose.net import Client, FetchError
-from wikihose.reading import DAYS, Progress, ReadingData, SpikeRow, Summary
+from wikihose.reading import DAYS, MIN_USUAL, Progress, ReadingData, SpikeRow, Summary
 from wikihose.sources.events import StreamItem
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.tabs.convergence import DOWN_PAUSE, ConvergenceTab
@@ -26,7 +26,7 @@ DAY = date(2026, 11, 6)
 
 
 def spike(title: str, multiple: float, views: int = 50000) -> SpikeRow:
-    return SpikeRow(title, views, views / multiple, multiple, (), True)
+    return SpikeRow(title, views, views / multiple, (), True)
 
 
 def edits(title: str, count: int, **kwargs: Any) -> list[StreamItem]:
@@ -117,9 +117,20 @@ def test_a_surge_row_needs_enough_views(clock: VirtualClock) -> None:
     for title in ("Tiny", "Big"):
         for _ in range(SURGE_EDITS):
             model.add(make_edit(title))
-    model.add_surge("Tiny", spike("Tiny", 40.0, views=MIN_SURGE_VIEWS - 1))
+    model.add_surge("Tiny", spike("Tiny", 2.0, views=MIN_SURGE_VIEWS - 1))  # a usual of 499.5: not new
     model.add_surge("Big", spike("Big", 3.0, views=MIN_SURGE_VIEWS))
     assert [r.title for r in model.ranked()] == ["Big"]
+
+
+def test_a_new_page_is_not_hot_in_reading(clock: VirtualClock) -> None:
+    # #26: the rule Reading ranks by. A page read less than MIN_USUAL a day has no multiple, from either source
+    model = Convergence("enwiki", clock)
+    model.set_reading([SpikeRow("New_In_Reading", 52699, 0.0, (), True), spike("Old", 3.0)])
+    for title in ("New In Reading", "New Surge", "Old"):
+        for _ in range(SURGE_EDITS):
+            model.add(make_edit(title))
+    model.add_surge("New Surge", SpikeRow("New_Surge", 50000, MIN_USUAL - 1, (), True))
+    assert [r.title for r in model.ranked()] == ["Old"]
 
 
 def test_a_surge_row_ranks_with_its_own_numbers(clock: VirtualClock) -> None:
