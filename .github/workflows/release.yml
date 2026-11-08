@@ -86,12 +86,28 @@ jobs:
     needs: verify
     uses: ./.github/workflows/build.yml
 
+  # The file set and the tag are checked before anything is attested, so no signed claim is made about a moved tag or a
+  # stray file. publish repeats both checks.
+  check:
+    name: Check the files and the tag
+    needs: [verify, build]
+    uses: WPTK/release-workflows/.github/workflows/check-release.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
+    with:
+      expected-files: |
+        wikihose-${{ needs.verify.outputs.version }}-py3-none-any.whl
+        wikihose-${{ needs.verify.outputs.version }}.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-windows-x86_64.exe
+        wikihose-${{ needs.verify.outputs.version }}-linux-x86_64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-linux-arm64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-macos-arm64.tar.gz
+        wikihose-${{ needs.verify.outputs.version }}-macos-x86_64.tar.gz
+
   # Provenance is made here, in this workflow, and not in the shared publish workflow: the certificate names the workflow
   # that ran the step, and `gh attestation verify --signer-workflow` (README, docs/release.md, post-release.yml) expects
   # this file. It attests the same artifacts the publish job releases.
   attest:
     name: Attest build provenance
-    needs: [verify, build]
+    needs: check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -117,7 +133,7 @@ jobs:
     needs: [verify, build, attest]
     permissions:
       contents: write
-    uses: WPTK/release-workflows/.github/workflows/publish-release.yml@190565e35fd4f915762602c22f0d36843189b132 # main, to be re-pinned to v0.1.0
+    uses: WPTK/release-workflows/.github/workflows/publish-release.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
     with:
       expected-files: |
         wikihose-${{ needs.verify.outputs.version }}-py3-none-any.whl

@@ -83,11 +83,13 @@ jobs:
   binary:
     name: Binary
     needs: version
-    uses: WPTK/release-workflows/.github/workflows/build-binaries.yml@190565e35fd4f915762602c22f0d36843189b132 # main, to be re-pinned to v0.1.0
+    uses: WPTK/release-workflows/.github/workflows/build-binaries.yml@48ad720b496558ebdf47c0a0529475b6bf3b4517 # v0.1.0
     with:
       app: wikihose
       asset-prefix: wikihose-${{ needs.version.outputs.version }}
       linux-container: python:3.12-bullseye@sha256:7cc929040c5e8cf6036c5099d62a83708427c131fb7a7c965b5ba51e995eea1c
-      install-command: python -m pip install -c .github/release-constraints.txt . tzdata "pyinstaller>=6.22,<7"
+      # PIP_CONSTRAINT is set here because a called workflow does not inherit this file's env: it pins the isolated build
+      # environment (hatchling) too, which -c does not.
+      install-command: PIP_CONSTRAINT="$PWD/.github/release-constraints.txt" python -m pip install . tzdata "pyinstaller>=6.22,<7"
       build-command: python scripts/build_binary.py --no-smoke
       smoke-command: python scripts/build_binary.py --smoke-only
