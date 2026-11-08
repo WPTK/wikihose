@@ -3,9 +3,9 @@
 A terminal dashboard for watching Wikipedia live: what people are editing right now, what people are suddenly reading,
 where the two overlap, and edits to the pages you choose to track.
 
-**Status: 0.1.0 release candidate. All five tabs work; the first release is not published yet.**
+**Status: 0.1.0, the first release. All five tabs work.**
 
-![The wikihose Live tab playing the bundled demo recording: a scrolling edit log on the left, edits per minute, a split of people and bots, and the most edited articles on the right.](docs/images/demo.svg)
+![The wikihose Live tab playing the bundled demo recording: a scrolling edit log on the left, edits per minute, a split of people and bots, and the most edited articles on the right.](https://raw.githubusercontent.com/WPTK/wikihose/v0.1.0/docs/images/demo.svg)
 
 *The Live tab playing the bundled demo recording (recorded data, not live).*
 
@@ -27,8 +27,7 @@ terminal.
 
 ## Install
 
-After the first release, either of these. With [pipx](https://pipx.pypa.io) (Windows, macOS or Linux, Python 3.12 or
-later):
+With [pipx](https://pipx.pypa.io) (Windows, macOS or Linux, Python 3.12 or later):
 
 ```powershell
 pipx install wikihose
@@ -37,18 +36,13 @@ wikihose
 
 Or, on Windows, download `wikihose-<version>-windows-x86_64.exe` from the
 [releases page](https://github.com/WPTK/wikihose/releases) and run it. No Python is needed. Each release lists
-`SHA256SUMS`, and this checks that the file was built here (see [docs/release.md](docs/release.md)):
+`SHA256SUMS`, and this checks that the file was built here (see [docs/release.md](https://github.com/WPTK/wikihose/blob/v0.1.0/docs/release.md)):
 
 ```powershell
 gh attestation verify .\wikihose-0.1.0-windows-x86_64.exe --repo WPTK/wikihose --signer-workflow WPTK/wikihose/.github/workflows/release.yml
 ```
 
-Until then, run it from a development checkout (see [CONTRIBUTING.md](CONTRIBUTING.md) for setup), in PowerShell:
-
-```powershell
-.venv\Scripts\python -m wikihose --demo
-.venv\Scripts\python -m wikihose
-```
+To run it from a clone instead, see [CONTRIBUTING.md](https://github.com/WPTK/wikihose/blob/v0.1.0/CONTRIBUTING.md) for the setup.
 
 ## Run it
 
@@ -66,8 +60,8 @@ wikihose is an unofficial project. It is not affiliated with, endorsed by, or sp
 Wikipedia is a trademark of the Wikimedia Foundation. It reads public Wikimedia feeds and APIs and keeps well inside
 their rate limits.
 
-See [docs/design.md](docs/design.md) for how it works and [CONTRIBUTING.md](CONTRIBUTING.md) to help.
+See [docs/design.md](https://github.com/WPTK/wikihose/blob/v0.1.0/docs/design.md) for how it works and [CONTRIBUTING.md](https://github.com/WPTK/wikihose/blob/v0.1.0/CONTRIBUTING.md) to help.
 
 ## License
 
-Code: [MIT](LICENSE). Recorded Wikimedia data in the test fixtures and the demo is CC BY-SA 4.0; see [NOTICE](NOTICE).
+Code: [MIT](https://github.com/WPTK/wikihose/blob/v0.1.0/LICENSE). Recorded Wikimedia data in the test fixtures and the demo is CC BY-SA 4.0; see [NOTICE](https://github.com/WPTK/wikihose/blob/v0.1.0/NOTICE).
