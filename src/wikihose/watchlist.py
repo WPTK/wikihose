@@ -120,7 +120,7 @@ class Watchlist:
             return False
         self._store.remove_watch(page.wiki, page.page_id)
         del self._pages[(page.wiki, page.page_id)]
-        self._titles.pop(page_key(current.wiki, current.title), None)
+        self._drop_title(current)
         return True
 
     # --- live changes ------------------------------------------------------------------------------------------------
@@ -140,9 +140,11 @@ class Watchlist:
 
     def rename(self, page: WatchedPage, new_title: str) -> WatchedPage:
         """Change a page's stored title. Used for move events and by the catch-up."""
-        current = self.current(page) or page
+        current = self.current(page)
+        if current is None:  # removed meanwhile: do not bring it back
+            return page
         title = page_key(current.wiki, new_title)[1]
-        self._titles.pop(page_key(current.wiki, current.title), None)
+        self._drop_title(current)
         self._store.rename_watch(current.wiki, current.page_id, title)
         return self._put(replace(current, title=title))
 
@@ -150,24 +152,35 @@ class Watchlist:
 
     def mark_seen(self, page: WatchedPage) -> WatchedPage:
         """The reader has looked at the page: everything up to the newest known revision is seen."""
-        current = self.current(page) or page
+        current = self.current(page)
+        if current is None:
+            return page
         self._store.mark_watch_seen(current.wiki, current.page_id, self._clock.now())
         return self._put(replace(current, unseen=0, seen_rev_id=current.last_rev_id))
 
     # --- for the catch-up --------------------------------------------------------------------------------------------
 
     def set_deleted(self, page: WatchedPage, deleted: bool) -> WatchedPage:
-        current = self.current(page) or page
-        return self._save(replace(current, deleted=deleted))
+        current = self.current(page)
+        return page if current is None else self._save(replace(current, deleted=deleted))
 
     def absorb(self, page: WatchedPage, *, unseen: int, last_rev_id: int, last_edit_at: datetime | None) -> WatchedPage:
-        """Take the counts the catch-up found. Never lowers what live edits already counted."""
-        current = self.current(page) or page
+        """Add ``unseen`` edits the catch-up found that are newer than the newest revision known, and move that
+        revision forward. A page that was removed meanwhile stays removed."""
+        current = self.current(page)
+        if current is None:
+            return page
         if last_rev_id > current.last_rev_id:
             current = replace(current, last_rev_id=last_rev_id, last_edit_at=last_edit_at or current.last_edit_at)
-        return self._save(replace(current, unseen=max(current.unseen, unseen)))
+        return self._save(replace(current, unseen=current.unseen + unseen))
 
     # --- internals ---------------------------------------------------------------------------------------------------
+
+    def _drop_title(self, page: WatchedPage) -> None:
+        """Forget a page's title, unless another page has taken that title since (a delete and re-create, a swap)."""
+        key = page_key(page.wiki, page.title)
+        if self._titles.get(key) == page.page_id:
+            del self._titles[key]
 
     def _put(self, page: WatchedPage) -> WatchedPage:
         self._pages[(page.wiki, page.page_id)] = page

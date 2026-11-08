@@ -174,12 +174,41 @@ def render_diff(
     return out
 
 
+def _expand_tabs(text: str, spans: tuple[Span, ...]) -> tuple[str, tuple[Span, ...]]:
+    """Replace tabs with spaces (to the next multiple of 4) and move the spans to match."""
+    if "\t" not in text:
+        return text, spans
+    out: list[str] = []
+    where = [0]  # where[i]: the offset in the new text of character i of the old
+    for char in text:
+        out.append(" " * (4 - where[-1] % 4) if char == "\t" else char)
+        where.append(where[-1] + len(out[-1]))
+    return "".join(out), tuple(Span(where[s.start], where[s.end], s.added) for s in spans)
+
+
+def _window(text: str, spans: tuple[Span, ...]) -> tuple[str, tuple[Span, ...], bool, bool]:
+    """At most MAX_LINE_CHARS of the line, starting a little before the first highlight so changes stay visible.
+    Also says whether text was cut at the start and at the end."""
+    if len(text) <= MAX_LINE_CHARS:
+        return text, spans, False, False
+    start = max(0, spans[0].start - 100) if spans else 0
+    end = min(len(text), start + MAX_LINE_CHARS)
+    kept = tuple(
+        Span(max(s.start, start) - start, min(s.end, end) - start, s.added)
+        for s in spans
+        if s.end > start and s.start < end
+    )
+    return text[start:end], kept, start > 0, end < len(text)
+
+
 def _line(line: DiffLine) -> Text:
-    body = Text(line.text.replace("\t", "    "), style=_LINE_STYLES[line.kind])
-    if line.kind == "changed" and "\t" not in line.text:
-        for span in line.spans:
-            body.stylize(ADDED_STYLE if span.added else REMOVED_STYLE, span.start, span.end)
-    body.truncate(MAX_LINE_CHARS, overflow="ellipsis")
+    text, spans = _expand_tabs(line.text, line.spans)
+    text, spans, cut_start, cut_end = _window(text, spans)
+    body = Text(("…" if cut_start else "") + text + ("…" if cut_end else ""), style=_LINE_STYLES[line.kind])
+    if line.kind == "changed":
+        shift = 1 if cut_start else 0
+        for span in spans:
+            body.stylize(ADDED_STYLE if span.added else REMOVED_STYLE, span.start + shift, span.end + shift)
     return Text(_MARKERS[line.kind], style=_LINE_STYLES[line.kind]) + body
 
 
