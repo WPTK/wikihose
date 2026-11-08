@@ -174,7 +174,7 @@ class MainScreen(Screen[None]):
         return self.query_one(ReadingTab).source
 
     def on_reading_tab_loaded(self, message: ReadingTab.Loaded) -> None:
-        self.query_one(ConvergenceTab).set_reading(message.wiki, message.rows)
+        self.query_one(ConvergenceTab).set_reading(message.wiki, message.rows, message.error)
 
     def on_convergence_tab_needs_reading(self, message: ConvergenceTab.NeedsReading) -> None:
         self.query_one(ReadingTab).start()

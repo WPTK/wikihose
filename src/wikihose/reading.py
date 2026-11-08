@@ -291,12 +291,13 @@ class ReadingData:
     async def spike_of(self, title: str) -> SpikeRow | None:
         """One article's spike on the newest day, from its own 30-day history (the Convergence surge trigger).
 
-        ``title`` may have spaces or underscores. None when there is no top list yet or the API has no data for it.
+        ``title`` may have spaces or underscores. The day is the one ``load`` ranked, so surge rows and the ranking
+        share one date. None before a ranking has loaded, or when the API has no data for the page.
         """
-        newest = await self.newest_day()
-        if newest is None:
+        today = self.day
+        if today is None:
             return None
-        today, todays = newest
+        todays = self._tops.get(today, {})
         name = title.replace(" ", "_")
         if not _encodable(name):
             return None

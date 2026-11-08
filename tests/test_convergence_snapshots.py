@@ -5,6 +5,7 @@ Update with ``--snapshot-update`` and read each SVG.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -16,7 +17,7 @@ from wikihose.config import Config
 from wikihose.convergence import SURGE_EDITS
 from wikihose.sources.events import StreamItem
 
-CLOCK_START = __import__("datetime").datetime(2026, 11, 7, 12, 0, tzinfo=__import__("datetime").UTC)
+CLOCK_START = datetime(2026, 11, 7, 12, 0, tzinfo=UTC)
 
 
 def fake() -> FakeReading:

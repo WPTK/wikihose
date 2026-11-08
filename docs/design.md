@@ -26,7 +26,9 @@ This file is the target. Session 1 starts with a design pass that may change the
      edits by people (bots left out) to the article in the last 15 minutes; "hot in Reading" means the last full day
      had at least 2 times the usual views; the score is edits times spike. The trigger fetches each page's history
      once per run, only after the tab has been opened and the day's Reading ranking has arrived, through the shared
-     request budget. Pages already in the Reading ranking are never fetched again.
+     request budget. Pages already in the Reading ranking are never fetched again. A queued page that stopped surging
+     before its turn is dropped (it can surge again later). A surge row needs at least 1,000 views on that day, so a
+     tiny or brand-new page cannot top the list.
 6. **Hourly** (later, maybe): near-real-time reading data from Wikimedia's hourly pageview dumps. Left out of the app
    until it is built (owner, 7 Nov 2026).
 

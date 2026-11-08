@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import Any
 
@@ -13,12 +14,12 @@ from test_reading import NEWEST, history_payload, mock_wiki
 from textual.widgets import Static
 
 from wikihose.clock import VirtualClock
-from wikihose.convergence import LABEL, MIN_SPIKE, SURGE_EDITS, WINDOW, Convergence
+from wikihose.convergence import LABEL, MIN_SPIKE, MIN_SURGE_VIEWS, SURGE_EDITS, WINDOW, Convergence
 from wikihose.net import Client, FetchError
 from wikihose.reading import DAYS, Progress, ReadingData, SpikeRow, Summary
 from wikihose.sources.events import StreamItem
 from wikihose.ui.app import WikihoseApp
-from wikihose.ui.tabs.convergence import ConvergenceTab, columns
+from wikihose.ui.tabs.convergence import DOWN_PAUSE, ConvergenceTab
 from wikihose.ui.widgets import PageTable
 
 DAY = date(2026, 11, 6)
@@ -99,6 +100,28 @@ def test_a_queued_surge_is_dropped_when_the_reading_ranking_arrives_with_it(cloc
     assert model.ranked()[0].surge is False
 
 
+def test_a_title_that_stopped_surging_while_queued_is_dropped_and_can_surge_again(clock: VirtualClock) -> None:
+    model = Convergence("enwiki", clock)
+    for _ in range(SURGE_EDITS):
+        model.add(make_edit("Old News"))
+    assert model.pending
+    clock.advance(WINDOW + 1)  # hours on the Live tab: the surge is over before anyone asks
+    assert model.next_surge() is None and not model.pending
+    for _ in range(SURGE_EDITS):
+        model.add(make_edit("Old News"))
+    assert model.next_surge() == "Old News"  # a new surge is fetched after all
+
+
+def test_a_surge_row_needs_enough_views(clock: VirtualClock) -> None:
+    model = Convergence("enwiki", clock)
+    for title in ("Tiny", "Big"):
+        for _ in range(SURGE_EDITS):
+            model.add(make_edit(title))
+    model.add_surge("Tiny", spike("Tiny", 40.0, views=MIN_SURGE_VIEWS - 1))
+    model.add_surge("Big", spike("Big", 3.0, views=MIN_SURGE_VIEWS))
+    assert [r.title for r in model.ranked()] == ["Big"]
+
+
 def test_a_surge_row_ranks_with_its_own_numbers(clock: VirtualClock) -> None:
     model = Convergence("enwiki", clock)
     for _ in range(SURGE_EDITS):
@@ -123,6 +146,8 @@ async def test_spike_of_fetches_one_history_and_caches_it(client: Client, clock:
         return_value=httpx.Response(200, json=history_payload(first, dict.fromkeys(range(DAYS - 1), 100) | {29: 2500}))
     )
     data = ReadingData(client, clock)
+    assert await data.spike_of("Rising Star") is None  # no ranked day yet
+    data.day = (await data.newest_day() or (None,))[0]  # what load() ranks; the rest of load is tested elsewhere
     row = await data.spike_of("Rising Star")
     assert row is not None and row.exact
     assert (row.title, row.views, row.baseline, row.multiple) == ("Rising_Star", 2500, 100.0, 25.0)
@@ -140,6 +165,7 @@ async def test_spike_of_uses_the_top_list_figure_and_handles_no_data(client: Cli
     )
     respx.get(url__regex=r".*/per-article/.*/Gone/daily/.*").mock(return_value=httpx.Response(404))
     data = ReadingData(client, clock)
+    data.day = (await data.newest_day() or (None,))[0]  # what load() ranks; the rest of load is tested elsewhere
     row = await data.spike_of("Spiky")
     assert row is not None and row.views == today["Spiky"]
     assert await data.spike_of("Gone") is None
@@ -152,13 +178,22 @@ async def test_spike_of_uses_the_top_list_figure_and_handles_no_data(client: Cli
 class FakeReading:
     """Reading data with a fixed ranking and a surge answer per title (no network)."""
 
-    def __init__(self, rows: list[SpikeRow], surges: dict[str, SpikeRow | FetchError | None] | None = None) -> None:
+    def __init__(
+        self,
+        rows: list[SpikeRow],
+        surges: dict[str, SpikeRow | FetchError | None] | None = None,
+        load_error: FetchError | None = None,
+    ) -> None:
         self.rows = rows
         self.surges = surges or {}
+        self.load_error = load_error
         self.day: date | None = None
         self.asked: list[str] = []
+        self.hold: asyncio.Event | None = None  # when set, spike_of waits for it
 
     async def load(self, progress: Progress | None = None) -> list[SpikeRow]:
+        if self.load_error is not None:
+            raise self.load_error
         self.day = DAY
         return self.rows
 
@@ -167,6 +202,8 @@ class FakeReading:
 
     async def spike_of(self, title: str) -> SpikeRow | None:
         self.asked.append(title)
+        if self.hold is not None:
+            await self.hold.wait()
         answer = self.surges.get(title, self.surges.get(title.replace(" ", "_")))
         if isinstance(answer, FetchError):
             raise answer
@@ -188,6 +225,20 @@ async def open_tab(app: WikihoseApp, pilot: Any) -> ConvergenceTab:
         tab.tick()
     await app.workers.wait_for_complete()
     await pilot.pause()
+    return tab
+
+
+async def open_tab_holding(app: WikihoseApp, pilot: Any, fake: FakeReading) -> ConvergenceTab:
+    """Open the tab and wait until the surge worker is stuck in ``fake.spike_of``."""
+    await wait_for_stream(app, pilot)
+    await pilot.press("5")
+    tab = app.query_one(ConvergenceTab)
+    for _ in range(20):
+        await pilot.pause()
+        tab.tick()
+        if fake.asked:
+            break
+    assert fake.asked, "the surge fetch never started"
     return tab
 
 
@@ -244,11 +295,73 @@ async def test_a_rate_limited_surge_waits_and_is_tried_again(clock: VirtualClock
         assert [row[0] for row in table_rows(app)] == ["Hot"]
 
 
+async def test_a_surge_that_cannot_reach_wikimedia_waits_a_minute(clock: VirtualClock) -> None:
+    fake = FakeReading([], {"Hot": FetchError("down", "no route")})
+    app = convergence_app(clock, fake, edits("Hot", SURGE_EDITS))
+    async with app.run_test(size=(80, 24)) as pilot:
+        tab = await open_tab(app, pilot)
+        assert fake.asked == ["Hot"]
+        assert f"again in {int(DOWN_PAUSE)}s" in text_of(app, "convergence-status")
+        clock.advance(DOWN_PAUSE - 1)
+        tab.tick()
+        await app.workers.wait_for_complete()
+        assert fake.asked == ["Hot"]  # still waiting
+        fake.surges["Hot"] = spike("Hot", 4.0)
+        clock.advance(2)
+        tab.tick()
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert fake.asked == ["Hot", "Hot"]
+        assert "rate" not in text_of(app, "convergence-status") and "1 hot in both" in text_of(
+            app, "convergence-status"
+        )
+
+
+async def test_bad_data_for_one_surge_moves_on_to_the_next(clock: VirtualClock) -> None:
+    fake = FakeReading([], {"Broken": FetchError("bad_data", "junk"), "Fine": spike("Fine", 5.0)})
+    app = convergence_app(clock, fake, edits("Broken", SURGE_EDITS) + edits("Fine", SURGE_EDITS))
+    async with app.run_test(size=(80, 24)) as pilot:
+        await open_tab(app, pilot)
+        assert fake.asked == ["Broken", "Fine"]
+        assert [row[0] for row in table_rows(app)] == ["Fine"]
+        assert "2 surge checks" in text_of(app, "convergence-status")
+
+
+async def test_a_wiki_change_during_a_surge_fetch_drops_its_answer(clock: VirtualClock) -> None:
+    fake = FakeReading([], {"Hot": FetchError("rate_limited", "slow down", retry_after=30)})
+    fake.hold = asyncio.Event()
+    app = convergence_app(clock, fake, edits("Hot", SURGE_EDITS))
+    async with app.run_test(size=(80, 24)) as pilot:
+        tab = await open_tab_holding(app, pilot, fake)
+        app.screen.set_reading_wiki("dewiki")  # type: ignore[attr-defined]
+        fake.hold.set()
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert tab.wiki == "dewiki" and tab.model.wiki == "dewiki"
+        assert "rate limited" not in text_of(app, "convergence-status")  # the old fetch's error is not shown
+        assert not tab.model.pending
+
+
+async def test_quitting_during_a_surge_fetch_is_clean(clock: VirtualClock) -> None:
+    fake = FakeReading([], {"Hot": spike("Hot", 4.0)})
+    fake.hold = asyncio.Event()
+    app = convergence_app(clock, fake, edits("Hot", SURGE_EDITS))
+    async with app.run_test(size=(80, 24)) as pilot:
+        await open_tab_holding(app, pilot, fake)
+        await pilot.press("q")
+        await pilot.pause()
+    assert app.return_code in (0, None)
+
+
 async def test_the_trigger_fetches_nothing_until_the_tab_is_opened(clock: VirtualClock) -> None:
     fake = FakeReading([], {"Hot": spike("Hot", 4.0)})
     app = convergence_app(clock, fake, edits("Hot", SURGE_EDITS))
     async with app.run_test(size=(80, 24)) as pilot:
         await wait_for_stream(app, pilot)
+        await pilot.press("2")  # Reading loads, so only the unopened tab holds the trigger back
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert fake.day == DAY
         app.query_one(ConvergenceTab).tick()
         await app.workers.wait_for_complete()
         assert fake.asked == []
@@ -258,7 +371,8 @@ async def test_the_trigger_fetches_nothing_until_the_tab_is_opened(clock: Virtua
     ("fake", "expected"),
     [
         (None, "needs the Reading numbers"),
-        (FakeReading([]), "Waiting for the Reading numbers"),
+        (FakeReading([]), "Reading found no spikes"),
+        (FakeReading([], load_error=FetchError("down", "no route")), "could not reach Wikimedia"),
         (FakeReading([spike("Unedited", 9.0)]), "Nothing is hot in both"),
     ],
 )
@@ -271,7 +385,7 @@ async def test_the_empty_tab_says_why(clock: VirtualClock, fake: FakeReading | N
         assert not app.query_one("#convergence-table", PageTable).display
 
 
-async def test_w_on_a_row_names_that_page(clock: VirtualClock) -> None:
+async def test_the_table_takes_the_focus_and_w_names_the_page_at_the_cursor(clock: VirtualClock) -> None:
     fake = FakeReading([spike("Busy_Page", 5.0)])
     app = convergence_app(clock, fake, edits("Busy Page", 3))
     async with app.run_test(size=(80, 24)) as pilot:
@@ -301,8 +415,13 @@ async def test_a_looping_demo_keeps_the_reading_ranking(clock: VirtualClock) -> 
         assert [r.title for r in tab.model.ranked()] == ["Busy Page"]
 
 
-@pytest.mark.parametrize("width", [80, 120, 160, 240])
-def test_the_columns_fit_without_scrolling_sideways(width: int) -> None:
-    from wikihose.ui.tabs.convergence import EDITS_WIDTH, FROM_WIDTH, SCORE_WIDTH, SPIKE_WIDTH
-
-    assert columns(width) + EDITS_WIDTH + SPIKE_WIDTH + SCORE_WIDTH + FROM_WIDTH + 2 * 5 + 2 <= width
+@pytest.mark.parametrize(("width", "height"), [(80, 24), (120, 30), (160, 48), (240, 60)])
+async def test_the_columns_fit_without_scrolling_sideways(clock: VirtualClock, width: int, height: int) -> None:
+    fake = FakeReading([spike("A_very_long_article_title_that_goes_on_and_on_" * 4, 5.0)])
+    app = convergence_app(clock, fake, edits("A very long article title that goes on and on " * 4, 3))
+    async with app.run_test(size=(width, height)) as pilot:
+        await open_tab(app, pilot)
+        table = app.query_one("#convergence-table", PageTable)
+        assert table.row_count == 1
+        assert table.virtual_size.width <= table.scrollable_content_region.width
+        assert table.max_scroll_x == 0

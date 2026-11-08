@@ -66,12 +66,13 @@ class ReadingTab(Vertical):
     """
 
     class Loaded(Message):
-        """A ranking for ``wiki`` finished loading (it may be empty). Convergence listens for it."""
+        """A ranking for ``wiki`` finished loading (it may be empty), or failed with ``error``. Convergence listens."""
 
-        def __init__(self, wiki: str, rows: list[SpikeRow]) -> None:
+        def __init__(self, wiki: str, rows: list[SpikeRow], error: str = "") -> None:
             super().__init__()
             self.wiki = wiki
             self.rows = rows
+            self.error = error
 
     def __init__(self, factory: Factory, wiki: str) -> None:
         super().__init__(id="reading-tab")
@@ -135,6 +136,7 @@ class ReadingTab(Vertical):
             if source is not self._source:
                 return
             self._say(describe(error))
+            self.post_message(self.Loaded(self.wiki, [], describe(error)))
             if error.kind == "rate_limited":
                 self._retry = self.set_timer(max(error.retry_after or 5, 1), self.load)
             return

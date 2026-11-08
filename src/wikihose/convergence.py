@@ -25,6 +25,7 @@ from wikihose.titles import page_key
 WINDOW = 15 * 60.0  # seconds of live edits that count
 SURGE_EDITS = 10  # edits by people within WINDOW that make the tab fetch a page's own pageview history
 MIN_SPIKE = 2.0  # "hot in Reading": the last full day had at least this many times the usual views
+MIN_SURGE_VIEWS = 1000  # a surge row needs this many views on that day, so a tiny or brand-new page cannot top the list
 LABEL = "live edits vs. the last full day of reading"
 
 
@@ -82,12 +83,26 @@ class Convergence:
         self._reading = {page_key(self.wiki, row.title)[1]: row for row in rows}
 
     def next_surge(self) -> str | None:
-        """The next title the surge trigger wants history for, or None. Each title comes out once per run."""
+        """The next title the surge trigger wants history for, or None.
+
+        A title is fetched once per run, unless it stopped surging while it waited in the queue (the tab was not open
+        yet, or the fetches were paused): then it is dropped and may be queued again by a later surge.
+        """
+        self._expire(self._clock.monotonic())
         while self._queue:
             title = self._queue.popleft()
-            if title not in self._reading:
-                return title
+            if title in self._reading:
+                continue
+            if self._edits.get(title, 0) < self._surge_edits:
+                self._asked.discard(title)
+                continue
+            return title
         return None
+
+    @property
+    def pending(self) -> bool:
+        """True when titles wait in the surge queue."""
+        return bool(self._queue)
 
     def requeue(self, title: str) -> None:
         """Put a title back at the front, for a fetch that was rate limited and will be tried again."""
@@ -114,6 +129,8 @@ class Convergence:
             surge = spike is None
             if spike is None:
                 spike = self._surged.get(title)
+                if spike is not None and spike.views < MIN_SURGE_VIEWS:
+                    continue
             if spike is not None and spike.multiple >= self._min_spike:
                 rows.append(ConvergenceRow(title, edits, spike, surge))
         rows.sort(key=lambda r: (-r.score, r.title))

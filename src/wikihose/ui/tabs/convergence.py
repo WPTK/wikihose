@@ -60,7 +60,7 @@ class ConvergenceTab(Vertical):
         self._reading_source = reading_source
         self.model = Convergence(wiki, clock)
         self._rows: list[SpikeRow] = []  # the Reading ranking last received for this wiki
-        self._reading_ready = False  # a non-empty ranking arrived
+        self._reading_error = ""  # why the Reading numbers did not load, from the Reading tab
         self._reading_seen = False  # a ranking arrived; the trigger waits for it, so it never asks for a ranked page
         self._day: date | None = None
         self._started = False  # the trigger fetches nothing until the tab has been opened once
@@ -88,6 +88,7 @@ class ConvergenceTab(Vertical):
             self._started = True
             self.post_message(self.NeedsReading())
             self.tick()
+        self.draw()  # the ticks skip drawing while the tab is hidden
 
     def on_resize(self, event: events.Resize) -> None:
         self.draw()
@@ -101,15 +102,17 @@ class ConvergenceTab(Vertical):
         if isinstance(item, Edit):
             self.model.add(item)
 
-    def set_reading(self, wiki: str, rows: list[SpikeRow]) -> None:
+    def set_reading(self, wiki: str, rows: list[SpikeRow], error: str = "") -> None:
+        """The Reading tab loaded its ranking for ``wiki``, or failed to with ``error`` (it can be loaded again)."""
         if wiki != self.wiki:
             return
-        self._rows = rows
-        self.model.set_reading(rows)
-        source = self._reading_source()
-        self._day = source.day if source is not None else None
-        self._reading_ready = bool(rows)
-        self._reading_seen = True
+        self._reading_error = error
+        if not error:
+            self._rows = rows
+            self.model.set_reading(rows)
+            source = self._reading_source()
+            self._day = source.day if source is not None else None
+            self._reading_seen = True
         self.draw()
 
     def set_wiki(self, wiki: str) -> None:
@@ -118,7 +121,8 @@ class ConvergenceTab(Vertical):
             return
         self.wiki = wiki
         self._rows = []
-        self._reading_ready = self._reading_seen = False
+        self._reading_error = ""
+        self._reading_seen = False
         self._day = None
         self.start_over()
 
@@ -133,14 +137,15 @@ class ConvergenceTab(Vertical):
     # --- the surge trigger -------------------------------------------------------------------------------------------
 
     def tick(self) -> None:
-        ready = self._started and self._reading_seen and not self._busy
+        ready = self._started and self._reading_seen and not self._busy and self.model.pending
         if ready and self._clock.monotonic() >= self._paused_until:
             source = self._reading_source()
-            if source is not None:
+            if source is not None and source.day is not None:  # no ranked day: no day to compare a surge with
                 self._busy = True
                 job = partial(self._fetch_surges, self.model, source)
                 self.run_worker(job, name="surge", group="surge")  # type: ignore[arg-type]
-        self.draw()
+        if self.is_on_screen:
+            self.draw()
 
     async def _fetch_surges(self, model: Convergence, source: ReadingSource) -> None:
         """Fetch history for each queued title, one at a time, through the shared client and its request budget."""
@@ -149,6 +154,8 @@ class ConvergenceTab(Vertical):
                 try:
                     row = await source.spike_of(title)
                 except FetchError as error:
+                    if model is not self.model:
+                        return  # the counts started over while this was fetching: the answer belongs to nothing
                     if error.kind == "bad_data":
                         row = None  # this title only; the next one may be fine
                     else:
@@ -161,13 +168,13 @@ class ConvergenceTab(Vertical):
                             else f"Pageviews: could not reach Wikimedia; checking surges again in {int(wait)}s"
                         )
                         return
+                if model is not self.model:
+                    return
                 model.add_surge(title, row)
                 self._note = ""
-                if self._day is None:
-                    self._day = source.day
         finally:
             self._busy = False
-            self.draw()
+            self.call_later(self.draw)  # not a direct draw: on quit the worker is cancelled after the widgets are gone
 
     # --- drawing -----------------------------------------------------------------------------------------------------
 
@@ -183,8 +190,9 @@ class ConvergenceTab(Vertical):
         heading = f"{LABEL[0].upper()}{LABEL[1:]}" + (f", {when}" if when else "")
         self.query_one("#convergence-heading", Static).update(Text(heading, no_wrap=True, overflow="ellipsis"))
         status = self._note or (
-            f"Score = edits by people in {MINUTES} min times spike · {len(rows)} hot in both · "
-            f"{self.model.surges} surge check" + ("" if self.model.surges == 1 else "s")
+            f"{len(rows)} hot in both · {self.model.surges} surge check"
+            + ("" if self.model.surges == 1 else "s")
+            + f" · score: edits by people in {MINUTES} min times spike"
         )
         self.query_one("#convergence-status", Static).update(Text(status, no_wrap=True, overflow="ellipsis"))
 
@@ -239,8 +247,12 @@ class ConvergenceTab(Vertical):
                 "Convergence needs the Reading numbers, and they need a live connection: they are not available in "
                 f"a replay or for this wiki.\n\n{rule}"
             )
-        if not self._reading_ready and not self.model.surges:
+        if self._reading_error:
+            return f"The Reading numbers did not load. The Reading tab (2) says: {self._reading_error}\n\n{rule}"
+        if not self._reading_seen:
             return f"Waiting for the Reading numbers…\n\n{rule}"
+        if not self._rows and not self.model.surges:
+            return f"Reading found no spikes for this day, so only a surge can show here.\n\n{rule}"
         return f"Nothing is hot in both right now.\n\n{rule}"
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
