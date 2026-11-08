@@ -34,12 +34,43 @@ pipx install wikihose
 wikihose
 ```
 
-Or, on Windows, download `wikihose-<version>-windows-x86_64.exe` from the
-[releases page](https://github.com/WPTK/wikihose/releases) and run it. No Python is needed. Each release lists
-`SHA256SUMS`, and this checks that the file was built here (see [docs/release.md](https://github.com/WPTK/wikihose/blob/v0.1.0/docs/release.md)):
+Or download a ready-made binary from the [releases page](https://github.com/WPTK/wikihose/releases). No Python is
+needed. Binaries are published from version 0.2.0; 0.1.0 has the Windows exe only.
 
-```powershell
-gh attestation verify .\wikihose-0.1.0-windows-x86_64.exe --repo WPTK/wikihose --signer-workflow WPTK/wikihose/.github/workflows/release.yml
+| Your computer | File |
+| --- | --- |
+| Windows (Intel or AMD) | `wikihose-<version>-windows-x86_64.exe` |
+| Mac with Apple silicon (M1 or later) | `wikihose-<version>-macos-arm64.tar.gz` |
+| Mac with an Intel chip | `wikihose-<version>-macos-x86_64.tar.gz` |
+| Linux, Intel or AMD | `wikihose-<version>-linux-x86_64.tar.gz` |
+| Linux, ARM (a Raspberry Pi 4 or 5 on 64-bit Linux, for example) | `wikihose-<version>-linux-arm64.tar.gz` |
+
+On macOS and Linux, unpack the archive and run the file inside it:
+
+```sh
+tar -xzf wikihose-<version>-macos-arm64.tar.gz
+./wikihose
+```
+
+The Linux binaries need glibc 2.31 or newer (Ubuntu 20.04, Debian 11 or newer). On a distribution with musl, such as
+Alpine, use `pipx`.
+
+**macOS blocks the first run.** The binary is not signed with an Apple Developer ID, so a browser download carries a
+quarantine flag and macOS says it cannot verify the app. Remove the flag once, then run it:
+
+```sh
+xattr -d com.apple.quarantine ./wikihose
+```
+
+(Or open System Settings, Privacy & Security, and choose Allow Anyway after the first blocked run.) Downloading with
+`curl` or `gh release download` sets no flag, so no step is needed. Windows may show a SmartScreen warning for the same
+reason: More info, then Run anyway.
+
+Each release lists `SHA256SUMS`, and this checks that a file was built here (see
+[docs/release.md](https://github.com/WPTK/wikihose/blob/v0.1.0/docs/release.md)); use the name of the file you downloaded:
+
+```sh
+gh attestation verify ./wikihose-0.2.0-linux-x86_64.tar.gz --repo WPTK/wikihose --signer-workflow WPTK/wikihose/.github/workflows/release.yml
 ```
 
 To run it from a clone instead, see [CONTRIBUTING.md](https://github.com/WPTK/wikihose/blob/v0.1.0/CONTRIBUTING.md) for the setup.

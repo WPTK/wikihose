@@ -98,7 +98,7 @@ jobs:
       - name: Collect the files and write SHA256SUMS
         run: |
           mkdir release
-          cp parts/dist/* parts/exe/* release/
+          cp parts/dist/* parts/binary-*/* release/
           cd release
           sha256sum -- * > SHA256SUMS
           cat SHA256SUMS

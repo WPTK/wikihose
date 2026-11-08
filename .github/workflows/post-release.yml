@@ -1,7 +1,8 @@
 name: Post-release
 
-# Checks a published release the way a user would: installs the version from PyPI with pipx and runs the published
-# Windows executable, each in a clean runner, then runs --version and --selftest. A failure means the release is
+# Checks a published release the way a user would: installs the version from PyPI with pipx and runs each published
+# binary on a runner of its own kind (Windows, Linux and macOS, x86_64 and arm64), each in a clean runner, then runs
+# --version and --selftest. A failure means the release is
 # broken for users. It publishes nothing.
 #
 # Triggers: `release: published` fires for releases made by a person. The Release workflow creates its release with
@@ -94,7 +95,7 @@ jobs:
       - name: Check the wheel, sdist and executable are for this version
         run: |
           cd dl
-          ls "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz" "wikihose-$VERSION-windows-x86_64.exe"
+          ls "wikihose-$VERSION-py3-none-any.whl" "wikihose-$VERSION.tar.gz"             "wikihose-$VERSION-windows-x86_64.exe"             "wikihose-$VERSION-linux-x86_64.tar.gz" "wikihose-$VERSION-linux-arm64.tar.gz"             "wikihose-$VERSION-macos-arm64.tar.gz" "wikihose-$VERSION-macos-x86_64.tar.gz"
 
   pipx:
     name: pipx install from PyPI (${{ matrix.os }})
@@ -131,32 +132,49 @@ jobs:
           [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
           wikihose --selftest
 
-  exe:
-    name: Published Windows executable
+  binary:
+    name: Published binary (${{ matrix.name }})
     needs: tag
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: windows-x86_64, os: windows-latest, ext: .exe}
+          - {name: linux-x86_64, os: ubuntu-latest, ext: .tar.gz}
+          - {name: linux-arm64, os: ubuntu-24.04-arm, ext: .tar.gz}
+          - {name: macos-arm64, os: macos-latest, ext: .tar.gz}
+          - {name: macos-x86_64, os: macos-15-intel, ext: .tar.gz}
     env:
       TAG: ${{ needs.tag.outputs.tag }}
       VERSION: ${{ needs.tag.outputs.version }}
+      NAME: wikihose-${{ needs.tag.outputs.version }}-${{ matrix.name }}${{ matrix.ext }}
     defaults:
       run:
         shell: bash
     steps:
-      # No checkout and no Python step: the executable must run on a runner with nothing of ours installed.
+      # No checkout and no Python step: the binary must run on a runner with nothing of ours installed.
       - name: Download the published file and verify its checksum
         run: |
           mkdir bin && cd bin
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
-          name="wikihose-$VERSION-windows-x86_64.exe"
           curl -fsSL --retry 3 -O "$base/SHA256SUMS"
-          curl -fsSL --retry 3 -O "$base/$name" || { echo "::error::cannot download $name"; exit 1; }
-          grep -F " $name" SHA256SUMS > one.sum || { echo "::error::$name is not listed in SHA256SUMS"; exit 1; }
-          sha256sum -c one.sum
-          cp "$name" wikihose.exe
+          curl -fsSL --retry 3 -O "$base/$NAME" || { echo "::error::cannot download $NAME"; exit 1; }
+          grep -F " $NAME" SHA256SUMS > one.sum || { echo "::error::$NAME is not listed in SHA256SUMS"; exit 1; }
+          if command -v sha256sum >/dev/null; then sha256sum -c one.sum; else shasum -a 256 -c one.sum; fi
+      # A downloaded archive has no quarantine flag here, so this checks the file itself, not Gatekeeper.
+      - name: Unpack it
+        run: |
+          cd bin
+          case "$NAME" in
+            *.exe) cp "$NAME" wikihose.exe ;;
+            *.tar.gz) tar -xzf "$NAME"; test -x wikihose || { echo "::error::the archive holds no executable wikihose"; exit 1; } ;;
+          esac
       - name: Run it
         working-directory: bin
         run: |
-          out=$(./wikihose.exe --version); echo "$out"
+          bin=./wikihose; if [ "$RUNNER_OS" = Windows ]; then bin=./wikihose.exe; fi
+          out=$("$bin" --version); echo "$out"
           [ "$out" = "wikihose $VERSION" ] || { echo "::error::expected 'wikihose $VERSION'"; exit 1; }
-          ./wikihose.exe --selftest
+          "$bin" --selftest

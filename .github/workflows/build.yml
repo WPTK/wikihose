@@ -1,6 +1,6 @@
 name: Build
 
-# Builds the sdist, the wheel and the Windows executable, and checks each one runs. Called by release.yml on a tag; also
+# Builds the sdist, the wheel and a one-file binary for each platform, and checks each one runs. Called by release.yml on a tag; also
 # runs by hand and on pull requests that touch the build, so a broken build shows up before a release rather than during
 # one. Nothing here publishes anything and it has no secrets.
 
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - scripts/build_exe.ps1
+      - scripts/build_binary.py
       - .github/release-constraints.txt
       - pyproject.toml
       - src/wikihose/**
@@ -58,30 +58,68 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  exe:
-    name: Windows executable
-    runs-on: windows-latest
+  # One binary per platform, each built on its own kind of machine (PyInstaller cannot cross-compile). The Linux builds
+  # run inside python:3.12-bullseye, pinned by digest, so the binaries need only glibc 2.31 and run on Ubuntu 20.04 and
+  # newer, Debian 11 and newer and the like; building on the runner itself would set the floor at that runner's glibc.
+  # Move the pin on purpose. macos-15-intel is GitHub's last Intel image (macos-13 is retired). Files Linux and macOS
+  # make are tar.gz archives, because an artifact upload drops the executable bit and an archive keeps it.
+  binary:
+    name: Binary (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    # Empty for the jobs that run straight on the runner; GitHub treats '' as "no container".
+    container: ${{ matrix.container }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86_64
+            os: windows-latest
+          - name: linux-x86_64
+            os: ubuntu-latest
+            container: python:3.12-bullseye@sha256:7cc929040c5e8cf6036c5099d62a83708427c131fb7a7c965b5ba51e995eea1c
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            container: python:3.12-bullseye@sha256:7cc929040c5e8cf6036c5099d62a83708427c131fb7a7c965b5ba51e995eea1c
+          - name: macos-arm64
+            os: macos-latest
+          - name: macos-x86_64
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: matrix.container == ''
         with:
           python-version: "3.12"
-      # tzdata is in the package's own dependencies on Windows, so the executable carries its own zone files.
-      - run: python -m pip install -c .github/release-constraints.txt . "pyinstaller>=6.22,<7"
-      - name: Build, then run --version and --selftest on the result
-        run: scripts/build_exe.ps1
+      # tzdata is in the package's own dependencies on Windows only; a binary may land on a system with no zone files, so
+      # every binary carries its own.
+      - name: Install
+        shell: bash
+        run: python -m pip install -c .github/release-constraints.txt . tzdata "pyinstaller>=6.22,<7"
+      - name: Build, then run --version, --selftest and a headless demo on the result
+        shell: bash
+        run: python scripts/build_binary.py
       - name: Name the file
         shell: bash
+        env:
+          NAME: ${{ matrix.name }}
         run: |
           version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/wikihose/__init__.py)
           mkdir out
-          cp dist/wikihose.exe "out/wikihose-$version-windows-x86_64.exe"
+          if [ "$RUNNER_OS" = Windows ]; then
+            cp dist/wikihose.exe "out/wikihose-$version-$NAME.exe"
+          else
+            tar -C dist -czf "out/wikihose-$version-$NAME.tar.gz" wikihose
+            listing=$(tar -tvzf "out/wikihose-$version-$NAME.tar.gz")
+            echo "$listing"
+            case "$listing" in -rwx*) ;; *) echo "::error::the archive lost the executable bit"; exit 1 ;; esac
+          fi
+          ls -l out
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: exe
+          name: binary-${{ matrix.name }}
           path: out/*
           if-no-files-found: error
           retention-days: 7

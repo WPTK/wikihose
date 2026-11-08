@@ -72,7 +72,7 @@ walkthrough step that proves it on the exe.
 | 16 | The app is described as unofficial, and the README and `--help` say so. | `test_help_says_unofficial`; README review (manual) |
 | 17 | Panes showing Wikipedia text link to the article. | `test_enter_on_a_log_row_opens_the_detail_with_the_article_link`, `test_the_diff_always_shows_the_address_of_the_article`; R3, D2 |
 | 18 | Orange is never a primary color or a background. | `tests/test_colours.py` (themes, every snapshot and docs SVG, the source) |
-| 19 | It installs with `pipx` from PyPI and as a single Windows exe. | smoke-test.md sections 1 and 2; `post-release.yml` (after the tag) |
+| 19 | It installs with `pipx` from PyPI and as a Windows exe, and from 0.2.0 as macOS and Linux binaries. | smoke-test.md sections 1, 1b and 2; `post-release.yml` (after the tag) |
 
 ## State matrix
 
