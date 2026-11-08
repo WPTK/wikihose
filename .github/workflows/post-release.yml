@@ -38,7 +38,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.path == '.github/workflows/release.yml')
+      startsWith(github.event.workflow_run.path, '.github/workflows/release.yml'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
