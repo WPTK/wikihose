@@ -174,6 +174,21 @@ class Store:
         with self._transaction():
             return self._db.execute("DELETE FROM edit_minutes WHERE minute < ?", (before,)).rowcount
 
+    def pageviews(self, wiki: str, page: str, first: str, last: str) -> dict[str, int]:
+        """Stored daily views (``YYYY-MM-DD`` -> views) for days ``first`` to ``last``, both included."""
+        rows = self._db.execute(
+            "SELECT day, views FROM pageviews WHERE wiki = ? AND page = ? AND day BETWEEN ? AND ?",
+            (wiki, page, first, last),
+        )
+        return dict(rows)
+
+    def save_pageviews(self, wiki: str, page: str, days: dict[str, int]) -> None:
+        with self._transaction():
+            self._db.executemany(
+                "INSERT OR REPLACE INTO pageviews (wiki, page, day, views) VALUES (?, ?, ?, ?)",
+                [(wiki, page, day, views) for day, views in days.items()],
+            )
+
     def add_watch(self, wiki: str, page_id: int, title: str, now: datetime, rev_id: int) -> bool:
         """Watch a page, already seen up to ``rev_id``. Returns False when it was already watched."""
         with self._transaction():

@@ -24,6 +24,7 @@ from wikihose.sources.replay import ReplaySource
 from wikihose.store import Store
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.tabs.diff import DiffTab
+from wikihose.ui.tabs.watchlist import WatchlistTab, page_key_of
 
 Before = Callable[[Any], Awaitable[None]]
 
@@ -122,6 +123,17 @@ async def populated_watchlist(pilot: Any) -> None:
     await open_tab(pilot, "3")
 
 
+async def watchlist_with_trends(pilot: Any) -> None:
+    """The first page has a rising 30-day trend, the next a falling one, and any other has no data."""
+    await populated_watchlist(pilot)
+    tab = pilot.app.query_one(WatchlistTab)
+    series = [tuple(range(1, 31)), tuple(range(30, 0, -1))]
+    for index, page in enumerate(pilot.app.watchlist.pages()):
+        tab._series[page_key_of(page)] = series[index] if index < len(series) else None
+    tab.refresh_rows()
+    await pilot.pause()
+
+
 async def empty_watchlist(pilot: Any) -> None:
     await open_tab(pilot, "3")
     # Nothing in the empty tab can take the focus, so where it lands after the switch (the tab strip or nowhere)
@@ -158,6 +170,10 @@ def test_watchlist_tab_empty(snap_compare: Any, size: tuple[int, int]) -> None:
 @pytest.mark.parametrize("size", [(80, 24), (120, 30)], ids=["80x24", "120x30"])
 def test_watchlist_tab_populated(snap_compare: Any, size: tuple[int, int]) -> None:
     assert snap_compare(watch_app(populated=True), terminal_size=size, run_before=populated_watchlist)
+
+
+def test_watchlist_tab_with_trends_120x30(snap_compare: Any) -> None:
+    assert snap_compare(watch_app(populated=True), terminal_size=(120, 30), run_before=watchlist_with_trends)
 
 
 def test_diff_tab_empty_80x24(snap_compare: Any) -> None:

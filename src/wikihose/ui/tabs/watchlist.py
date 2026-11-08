@@ -8,24 +8,30 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import tzinfo
+from functools import partial
 
 from rich.text import Text
 from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.timer import Timer
 from textual.widgets import DataTable, Static
 
 from wikihose.diff import DiffHeader
+from wikihose.net import FetchError
 from wikihose.store import WatchedPage
 from wikihose.titles import article_url, host_for_wiki
+from wikihose.trend import Trends
 from wikihose.ui.dialogs import ConfirmRemove
 from wikihose.ui.tabs.diff import DiffRequest, OpenDiff
+from wikihose.ui.tabs.reading import describe
+from wikihose.ui.widgets import spark
 from wikihose.watchlist import Watchlist
 
 EDITOR_FROM = 100  # columns of window width
 EDITOR_WIDTH = 18
-TREND_WIDTH = 8  # room for the sparkline that is wired in later
+TREND_WIDTH = 8  # one cell per three or four days
 WIKI_WIDTH = 8
 UNSEEN_WIDTH = 6
 LAST_WIDTH = 12
@@ -51,10 +57,13 @@ class WatchlistTab(Vertical):
     DEFAULT_CSS = """
     WatchlistTab { height: 1fr; }
     WatchlistTab DataTable { height: 1fr; }
+    WatchlistTab #watch-status { display: none; height: 1; padding: 0 1; color: $text-muted; }
     WatchlistTab #watch-empty { padding: 1 2; color: $text-muted; height: 1fr; }
     """
 
-    def __init__(self, watchlist: Watchlist, tz: tzinfo, editor_of: Callable[[WatchedPage], str]) -> None:
+    def __init__(
+        self, watchlist: Watchlist, tz: tzinfo, editor_of: Callable[[WatchedPage], str], trends: Trends | None = None
+    ) -> None:
         super().__init__(id="watchlist-tab")
         self._watchlist = watchlist
         self._tz = tz
@@ -62,8 +71,14 @@ class WatchlistTab(Vertical):
         self._rows: dict[str, WatchedPage] = {}
         self._pending = False  # a redraw is already queued
         self._layout: tuple[bool, int] | None = None  # (wide, title width) the columns were built for
+        self._trends = trends
+        self._series: dict[str, tuple[int, ...] | None] = {}  # page key -> 30 days of views; None: no data
+        self._filling = False  # the trend worker is running, so a page without a trend yet shows "·"
+        self._shown = False
+        self._retry: Timer | None = None
 
     def compose(self) -> ComposeResult:
+        yield Static(id="watch-status")
         yield Static(EMPTY, id="watch-empty")
         yield DataTable(id="watch-table", cursor_type="row", zebra_stripes=False)
 
@@ -72,7 +87,76 @@ class WatchlistTab(Vertical):
         self.refresh_rows()
 
     def on_resize(self, event: events.Resize) -> None:
+        was_wide = self._layout is not None and self._layout[0]
         self.refresh_rows()
+        if self._layout is not None and self._layout[0] and not was_wide:
+            self._start_fill()
+
+    def on_show(self) -> None:
+        self._shown = True
+        self._start_fill()
+
+    def on_hide(self) -> None:
+        self._shown = False
+
+    # --- the trend column --------------------------------------------------------------------------------------------
+
+    def _say(self, text: str) -> None:
+        status = self.query_one("#watch-status", Static)
+        status.display = bool(text)
+        status.update(Text(text, no_wrap=True, overflow="ellipsis"))
+
+    def _start_fill(self) -> None:
+        """Fetch the missing trends, one page at a time, when the column is on screen. A restart skips what is done."""
+        if self._retry is not None:
+            self._retry.stop()
+            self._retry = None
+        if self._trends is None or not self._shown or not self._layout or not self._layout[0]:
+            return
+        if all(page_key_of(page) in self._series for page in self._watchlist.pages()):
+            return
+        job = partial(self._fill, self._trends)
+        self.run_worker(job, name="trend", group="trend", exclusive=True)  # type: ignore[arg-type]
+
+    async def _fill(self, trends: Trends) -> None:
+        self._filling = True
+        self.refresh_rows()
+        try:
+            first = True
+            for page in self._watchlist.pages():
+                key = page_key_of(page)
+                if key in self._series:
+                    continue
+                if not trends.supported(page):
+                    self._series[key] = None
+                    continue
+                if not first:
+                    await trends.pause()
+                first = False
+                try:
+                    self._series[key] = await trends.fetch(page)
+                except FetchError as error:
+                    self._say(describe(error))
+                    if error.kind == "bad_data":  # one odd page must not block the rest
+                        self._series[key] = None
+                        continue
+                    if error.kind == "rate_limited":
+                        self._retry = self.set_timer(max(error.retry_after or 5, 1), self._start_fill)
+                    return
+                self._schedule_refresh()
+            self._say("")
+        finally:
+            self._filling = False
+            self.refresh_rows()
+
+    def _trend_cell(self, page: WatchedPage) -> Text:
+        key = page_key_of(page)
+        if key not in self._series:
+            return Text("·" if self._filling else "-", style="dim")
+        series = self._series[key]
+        if not series or not any(series):
+            return Text("-", style="dim")
+        return Text(spark(series, TREND_WIDTH), style=self.app.current_theme.primary, no_wrap=True)
 
     # --- drawing -----------------------------------------------------------------------------------------------------
 
@@ -130,7 +214,7 @@ class WatchlistTab(Vertical):
             if wide:
                 editor = Text(self._editor_of(page) or "-", style="dim", no_wrap=True)
                 editor.truncate(EDITOR_WIDTH, overflow="ellipsis")
-                cells += [editor, Text("-", style="dim")]
+                cells += [editor, self._trend_cell(page)]
             cells.append(Text("deleted", style=theme.error or "bold") if page.deleted else Text(""))
             table.add_row(*cells, key=key)
         if keep_key in self._rows:

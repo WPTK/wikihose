@@ -78,6 +78,7 @@ src/wikihose/
   watchlist_input.py  reading what the user types after w: a title or a pasted article URL
   watchlist.py  the Watchlist service: add by page ID, in-memory match by (wiki, title), moves, unseen counts, and
                 subscribe/in/len for the tabs that redraw when it changes
+  trend.py      the Watchlist tab's 30-day pageview trend: fetched through ReadingData.history, cached in the pageviews table
   catchup.py    startup catch-up of the watched pages through the Action API
   diff.py       the REST compare payload as data, and render_diff for a Rich Text
   sources/      one DataSource interface, two sources
@@ -92,7 +93,7 @@ src/wikihose/
     bars.py       TopBar and HealthBar (which also carries the catch-up progress line)
     bindings.py   declared_bindings: our own bindings, for the help screen and the inventory test
     dialogs.py    help, add a page, stop watching a page, change wiki, edit detail
-    widgets.py    PageTable, a table that can say which page the cursor is on
+    widgets.py    PageTable (a table that can say which page the cursor is on) and spark, the sparkline text
     theme.py      the themes
     tabs/         live.py (Live), watchlist.py (Watchlist), diff.py (Diff and the OpenDiff message that asks for
                   one) and stub.py (Reading and Convergence, until they are built)
