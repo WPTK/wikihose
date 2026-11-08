@@ -23,11 +23,13 @@ from urllib.parse import quote
 
 from wikihose.clock import Clock
 from wikihose.namespaces import NamespaceFilter
-from wikihose.net import Client
+from wikihose.net import Client, FetchError
 
 DAYS = 30  # the newest day plus the 29 before it
 MIN_VIEWS = 5000  # a page needs this many views on the newest day to count as a spike (owner's choice)
 EXACT_COUNT = 50  # per-article history is fetched for this many candidates
+MAX_VIEWS = 10**12  # larger than any real count; keeps the median arithmetic in float range
+MIN_LISTS = 10  # fewer earlier lists than this and no baseline is trustworthy
 LATEST_TRIES = 3  # how many days back to look for the newest top list (a day's list appears hours after it ends)
 
 Progress = Callable[[int, int], None]
@@ -73,7 +75,16 @@ def history_url(project: str, title: str, first: date, last: date) -> str:
 
 
 def _int(value: Any) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_VIEWS else None
+
+
+def _encodable(title: str) -> bool:
+    """False for a title with a lone surrogate, which cannot go into a URL."""
+    try:
+        title.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def parse_top(payload: Any) -> dict[str, int]:
@@ -86,7 +97,7 @@ def parse_top(payload: Any) -> dict[str, int]:
     if not isinstance(rows, list):
         return result
     for row in rows:
-        if isinstance(row, dict) and isinstance(row.get("article"), str):
+        if isinstance(row, dict) and isinstance(row.get("article"), str) and _encodable(row["article"]):
             views = _int(row.get("views"))
             if views is not None and row["article"] not in result:
                 result[row["article"]] = views
@@ -167,7 +178,7 @@ class ReadingData:
         self._exact_count = exact_count
         self._filter: NamespaceFilter | None = None
         self._tops: dict[date, dict[str, int]] = {}  # past days never change, so they are kept for the session
-        self._histories: dict[tuple[str, date], list[int]] = {}
+        self._histories: dict[tuple[str, date], list[int] | None] = {}  # None: the API has no data for the page
         self._summaries: dict[str, Summary | None] = {}
 
     async def namespace_filter(self) -> NamespaceFilter:
@@ -185,7 +196,10 @@ class ReadingData:
 
     async def _top(self, day: date) -> dict[str, int]:
         if day not in self._tops:
-            self._tops[day] = parse_top(await self._client.get_json(top_url(self._project, day)))
+            top = parse_top(await self._client.get_json(top_url(self._project, day)))
+            if not top:
+                return top  # an empty answer may just be too early; ask again next time
+            self._tops[day] = top
         return self._tops[day]
 
     async def newest_day(self) -> tuple[date, dict[str, int]] | None:
@@ -195,7 +209,6 @@ class ReadingData:
             top = await self._top(day)
             if top:
                 return day, top
-            self._tops.pop(day, None)  # an empty answer may just be too early: ask again next time
             day -= timedelta(days=1)
         return None
 
@@ -219,18 +232,26 @@ class ReadingData:
             if progress:
                 progress(done, total)
 
+        if len(earlier) < MIN_LISTS:
+            return []  # too few earlier lists for a baseline; an empty tab is better than a false ranking
         candidates = [
             (spike_multiple(views, bounded_baseline(title, earlier)), title, views)
             for title, views in todays.items()
             if views >= self._min_views and flt.is_article(title)
         ]
         candidates.sort(key=lambda c: (-c[0], c[1]))
+        total = done + min(len(candidates), self._exact_count)
         rows: list[SpikeRow] = []
         for position, (multiple, title, views) in enumerate(candidates):
             if position >= self._exact_count:
                 rows.append(SpikeRow(title, views, bounded_baseline(title, earlier), multiple, (), False))
                 continue
-            series = await self.history(title, first)
+            try:
+                series = await self.history(title, first)
+            except FetchError as exc:
+                if exc.kind != "bad_data":  # one odd title must not block the tab; down and throttling still stop it
+                    raise
+                series = None
             done += 1
             if progress:
                 progress(done, total)
@@ -249,10 +270,9 @@ class ReadingData:
         if key not in self._histories:
             last = first + timedelta(days=DAYS - 1)
             payload = await self._client.get_json(history_url(self._project, title, first, last))
-            if payload is None:
-                return None
-            self._histories[key] = parse_history(payload, first)
-        return list(self._histories[key])
+            self._histories[key] = None if payload is None else parse_history(payload, first)
+        cached = self._histories[key]
+        return None if cached is None else list(cached)
 
     async def summary(self, title: str) -> Summary | None:
         if title not in self._summaries:

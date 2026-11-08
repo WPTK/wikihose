@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -98,7 +98,7 @@ def test_parse_summary() -> None:
 # --- the full load against mocked endpoints --------------------------------------------------------------------------
 
 
-def mock_wiki(router: respx.MockRouter, *, newest: date = NEWEST) -> dict[str, int]:
+def mock_wiki(router: respx.MockRouter, *, newest: date = NEWEST, lists: int = DAYS) -> dict[str, int]:
     """30 daily lists: a steady giant, a one-day spike, a non-article, a small page and Main_Page."""
     router.get("https://en.wikipedia.org/w/api.php").mock(return_value=httpx.Response(200, json=SITEINFO))
     today = {
@@ -109,7 +109,7 @@ def mock_wiki(router: respx.MockRouter, *, newest: date = NEWEST) -> dict[str, i
         "Tiny": 900,
         "Main_Page": 99999,
     }
-    for n in range(DAYS):
+    for n in range(lists):
         day = date.fromordinal(newest.toordinal() - n)
         rows = dict(today) if n == 0 else {"Steady": 40000, "Special:Search": 70000, "Main_Page": 99999, "Filler": 8000}
         if n != 0:
@@ -143,7 +143,7 @@ async def test_load_ranks_spikes_and_filters(client: Client, clock: VirtualClock
     assert len(spiky.series) == DAYS and spiky.series[-1] == 90000 and spiky.series[1] == 0
     assert not ramayana.exact and ramayana.series == () and ramayana.baseline == 20000  # 404: keeps the bound
     assert steady.exact and steady.multiple == 1.0
-    assert seen[-1][0] == seen[-1][1] - (50 - 3)  # three candidates, so 47 of the exact budget went unused
+    assert seen[-1][0] == seen[-1][1]  # progress ends complete even with few candidates
     await data.namespace_filter()
 
 
@@ -179,3 +179,41 @@ async def test_summary_is_fetched_once(client: Client, clock: VirtualClock) -> N
 
 def test_spike_row_display_title() -> None:
     assert SpikeRow("Ada_Lovelace", 1, 1.0, 1.0, (), False).display_title == "Ada Lovelace"
+
+
+@respx.mock
+async def test_window_and_utc_day(client: Client) -> None:
+    """At 00:30 UTC on the 7th the newest list is the 6th; history runs from the 8th Oct to the 6th Nov."""
+    mock_wiki(respx.mock)
+    urls: list[str] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        urls.append(str(request.url))
+        return httpx.Response(404)
+
+    respx.get(url__regex=r".*/per-article/.*").mock(side_effect=record)
+    early = VirtualClock(datetime(2026, 11, 7, 0, 30, tzinfo=UTC))
+    await ReadingData(client, early, exact_count=1).load()
+    assert urls and urls[0].endswith("/daily/20261008/20261106")
+
+
+@respx.mock
+async def test_a_bad_history_answer_keeps_the_bound_and_a_404_is_remembered(
+    client: Client, clock: VirtualClock
+) -> None:
+    mock_wiki(respx.mock)
+    respx.get(url__regex=r".*/per-article/.*/Spiky/daily/.*").mock(return_value=httpx.Response(400))
+    gone = respx.get(url__regex=r".*/per-article/.*/Ramayana.*").mock(return_value=httpx.Response(404))
+    respx.get(url__regex=r".*/per-article/.*/Steady/daily/.*").mock(return_value=httpx.Response(404))
+    data = ReadingData(client, clock)
+    rows = await data.load()
+    assert rows[0].title == "Spiky" and not rows[0].exact
+    await data.load()
+    assert gone.call_count == 1
+
+
+@respx.mock
+async def test_too_few_earlier_lists_gives_no_ranking(client: Client, clock: VirtualClock) -> None:
+    mock_wiki(respx.mock, lists=2)  # the newest day and one earlier
+    respx.get(url__regex=r".*/top/.*").mock(return_value=httpx.Response(404))
+    assert await ReadingData(client, clock).load() == []
