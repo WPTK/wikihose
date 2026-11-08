@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -302,12 +304,17 @@ def test_sse_id_with_nul_is_ignored_and_one_leading_space_is_stripped() -> None:
 
 # --- stream ----------------------------------------------------------------------------------------------------------
 
+
+def sse(content: bytes) -> httpx.Response:
+    return httpx.Response(200, content=content, headers={"Content-Type": "text/event-stream"})
+
+
 BODY = b": hi\nid: 1\ndata: one\n\nid: 2\ndata: two\n\n"
 
 
 @respx.mock
 async def test_stream_yields_events_and_sends_the_headers(client: Client) -> None:
-    route = respx.get(URL).mock(return_value=httpx.Response(200, content=BODY))
+    route = respx.get(URL).mock(return_value=sse(BODY))
     events = [e async for e in client.stream(URL, "prev")]
     assert [(e.id, e.data) for e in events] == [("1", "one"), ("2", "two")]
     request = route.calls.last.request
@@ -318,14 +325,14 @@ async def test_stream_yields_events_and_sends_the_headers(client: Client) -> Non
 
 @respx.mock
 async def test_stream_without_an_id_sends_no_last_event_id(client: Client) -> None:
-    route = respx.get(URL).mock(return_value=httpx.Response(200, content=BODY))
+    route = respx.get(URL).mock(return_value=sse(BODY))
     [e async for e in client.stream(URL, None)]
     assert "last-event-id" not in route.calls.last.request.headers
 
 
 @respx.mock
 async def test_stream_connect_counts_once_against_the_budget(client: Client, budget: RequestBudget) -> None:
-    respx.get(URL).mock(return_value=httpx.Response(200, content=BODY))
+    respx.get(URL).mock(return_value=sse(BODY))
     [e async for e in client.stream(URL)]
     assert budget.stats()["used"] == 1
 
@@ -357,3 +364,76 @@ async def test_stream_errors_map_to_kinds(client: Client) -> None:
     with pytest.raises(FetchError) as caught:
         [e async for e in client.stream(URL)]
     assert caught.value.kind == "down"
+
+
+@respx.mock
+async def test_stream_rejects_other_content_types(client: Client) -> None:
+    route = respx.get(URL).mock(return_value=httpx.Response(200, content=BODY, headers={"Content-Type": "text/html"}))
+    with pytest.raises(FetchError) as caught:
+        [e async for e in client.stream(URL)]
+    assert caught.value.kind == "bad_data"
+    route.mock(return_value=httpx.Response(200, content=BODY))  # no content type at all
+    with pytest.raises(FetchError):
+        [e async for e in client.stream(URL)]
+
+
+@respx.mock
+async def test_stream_never_sends_an_unsafe_last_event_id(client: Client) -> None:
+    route = respx.get(URL).mock(return_value=sse(BODY))
+    for bad in ("a\r\nX-Evil: 1", "caf\u00e9", "x" * 1001):
+        [e async for e in client.stream(URL, bad)]
+        assert "last-event-id" not in route.calls.last.request.headers
+
+
+async def test_stream_with_an_unbuildable_url_is_a_fetch_error(client: Client) -> None:
+    with pytest.raises(FetchError) as caught:
+        [e async for e in client.stream("http://[bad")]
+    assert caught.value.kind in ("bad_data", "down")
+
+
+@respx.mock
+async def test_a_stream_is_not_written_to_the_http_cache(
+    clock: VirtualClock, budget: RequestBudget, tmp_path: Path
+) -> None:
+    stream_headers = {"Content-Type": "text/event-stream", "Cache-Control": "max-age=600"}
+    respx.get(URL).mock(return_value=httpx.Response(200, content=BODY, headers=stream_headers))
+    respx.get("https://example.test/json").mock(
+        return_value=httpx.Response(200, json=[1], headers={"Cache-Control": "max-age=600"})
+    )
+    http = Client(clock, budget, cache_dir=tmp_path / "cache")
+    try:
+        [e async for e in http.stream(URL)]
+        await http.get_json("https://example.test/json")  # proves the cache is in use
+    finally:
+        await http.aclose()
+    with closing(sqlite3.connect(tmp_path / "cache" / "http-cache.db")) as db:
+        rows = db.execute("SELECT count(*) FROM entries").fetchone()[0]
+    assert rows == 1  # the JSON response only
+
+
+# --- SSE limits ------------------------------------------------------------------------------------------------------
+
+
+def test_sse_feed_text_handles_chunks_split_anywhere() -> None:
+    text = "id: 1\r\ndata: a\r\ndata: b\r\n\r\n: c\rid: 2\rdata: z\r\r\n"
+    for size in (1, 2, 3, 7, 100):
+        parser = SseParser()
+        events = []
+        for i in range(0, len(text), size):
+            events += parser.feed_text(text[i : i + size])
+        assert events == [SseEvent("1", "message", "a\nb"), SseEvent("2", "message", "z")], size
+
+
+def test_sse_oversize_line_and_event_are_replaced_by_a_marker() -> None:
+    parser = SseParser()
+    events = parser.feed_text("data: " + "x" * (1024 * 1024 + 10) + "\n\n")
+    events += parser.feed_text("data: " + "x" * 600_000 + "\ndata: " + "y" * 600_000 + "\n\n")
+    events += parser.feed_text("data: ok\n\n")
+    assert [e.event for e in events] == ["oversize", "oversize", "message"]
+    assert events[-1].data == "ok"
+    parser = SseParser()  # a long line that arrives in pieces, never with a newline
+    events = []
+    for _ in range(40):
+        events += parser.feed_text("x" * 100_000)
+    events += parser.feed_text("\n\ndata: after\n\n")
+    assert [e.event for e in events] == ["oversize", "message"]

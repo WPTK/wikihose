@@ -10,6 +10,8 @@ from __future__ import annotations
 import gzip
 import importlib.resources
 import json
+import math
+import zlib
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -23,6 +25,8 @@ from wikihose.sse import SseEvent
 FORMAT = "wikihose-recording"
 VERSION = 1
 FLUSH_SECONDS = 1.0
+HEADER_LIMIT = 64 * 1024  # longest header line read
+READ_ERRORS = (EOFError, OSError, UnicodeDecodeError, zlib.error)  # a damaged or cut-off file
 
 
 class RecordingError(ValueError):
@@ -95,18 +99,25 @@ class RecordedEvents:
         self._lines = lines
         self._handle = handle
         self.skipped = 0
+        self._closed = False
 
     def __iter__(self) -> Iterator[RecordedEvent]:
         return self
 
+    def close(self) -> None:
+        self._closed = True
+        self._handle.close()
+
     def __next__(self) -> RecordedEvent:
         while True:
+            if self._closed:
+                raise StopIteration
             try:
                 line = next(self._lines)
             except StopIteration:
                 self._handle.close()
                 raise
-            except (EOFError, OSError, UnicodeDecodeError):  # a recording cut off mid-write
+            except READ_ERRORS:  # a recording cut off mid-write, or damaged
                 self.skipped += 1
                 self._handle.close()
                 raise StopIteration from None
@@ -127,6 +138,8 @@ def _event_of(line: str) -> RecordedEvent | None:
         return None
     if isinstance(t, bool) or not isinstance(t, int | float) or not isinstance(data, str):
         return None
+    if not math.isfinite(t) or t < 0:
+        return None
     if id_ is not None and not isinstance(id_, str):
         return None
     return RecordedEvent(t=float(t), id=id_, data=data)
@@ -136,9 +149,16 @@ def read_recording(path: Path) -> tuple[RecordingHeader, RecordedEvents]:
     """Open a recording; raises ``RecordingError`` when the header is missing or not a v1 wikihose header."""
     try:
         handle = gzip.open(path, "rt", encoding="utf-8")  # noqa: SIM115  (closed by RecordedEvents)
-        first = handle.readline()
-    except (OSError, EOFError, UnicodeDecodeError) as exc:
+    except READ_ERRORS as exc:
         raise RecordingError(f"cannot read {path}: {exc}") from exc
+    try:
+        first = handle.readline(HEADER_LIMIT)
+    except READ_ERRORS as exc:
+        handle.close()
+        raise RecordingError(f"cannot read {path}: {exc}") from exc
+    if len(first) >= HEADER_LIMIT and not first.endswith("\n"):
+        handle.close()
+        raise RecordingError(f"{path} has no recording header")
     try:
         raw = json.loads(first)
         if raw["format"] != FORMAT or raw["version"] != VERSION:

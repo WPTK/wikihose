@@ -26,15 +26,18 @@ class ReplaySource:
 
     def __init__(self, path: Path, clock: Clock, *, speed: float = 1.0) -> None:
         self.clock = clock
-        self._header, events = read_recording(path)
-        self._events = list(events)
-        self.skipped_lines = events.skipped
+        self._header, self._events = read_recording(path)
         self.recorded_start: datetime = self._header.recorded_at
         self._elapsed = 0.0  # recorded seconds played so far
         self._speed = _clamp(speed)
         self._running = asyncio.Event()
         self._running.set()
         self._closed = False
+
+    @property
+    def skipped_lines(self) -> int:
+        """Bad lines passed over so far; complete once the replay has finished."""
+        return self._events.skipped
 
     @property
     def speed(self) -> float:
@@ -66,6 +69,8 @@ class ReplaySource:
     async def items(self) -> AsyncIterator[StreamItem]:
         yield FeedStatus("stream", "ok", at=self.moment())
         for event in self._events:
+            if self._closed:
+                break
             while event.t > self._elapsed and not self._closed:
                 if self.paused:
                     await self._running.wait()
@@ -73,7 +78,7 @@ class ReplaySource:
                 gap = event.t - self._elapsed
                 step = min(gap, MAX_STEP * self._speed)
                 await self.clock.sleep(step / self._speed)
-                self._elapsed = event.t if step == gap else self._elapsed + step
+                self._elapsed = max(self._elapsed, event.t) if step == gap else self._elapsed + step
             if self._closed:
                 break
             item, _ = parse_event(event.data)
@@ -83,6 +88,7 @@ class ReplaySource:
 
     async def aclose(self) -> None:
         self._closed = True
+        self._events.close()
         self.resume()  # release a paused items() so it can end
 
 

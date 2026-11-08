@@ -6,6 +6,7 @@ import asyncio
 import gzip
 import json
 import re
+from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -195,6 +196,10 @@ def test_feed_status_message(state: str, detail: str, retry_in: float | None, me
 # --- the live source -------------------------------------------------------------------------------------------------
 
 
+def sse(content: bytes) -> httpx.Response:
+    return httpx.Response(200, content=content, headers={"Content-Type": "text/event-stream; charset=utf-8"})
+
+
 def sse_body(events: list[RecordedEvent]) -> bytes:
     return "".join(f"id: {e.id}\ndata: {e.data}\n\n" for e in events).encode()
 
@@ -255,7 +260,7 @@ def live(client: Client, clock: VirtualClock) -> LiveSource:
 @respx.mock
 async def test_live_yields_connecting_ok_then_items_in_order(live: LiveSource, sample_path: Path) -> None:
     first, second = two_events(sample_path)
-    respx.get(RECENTCHANGE_URL).mock(return_value=httpx.Response(200, content=sse_body([first, second])))
+    respx.get(RECENTCHANGE_URL).mock(return_value=sse(sse_body([first, second])))
     items = await take(live, 4)
     assert states(items) == ["connecting", "ok", "Edit", "Edit"]
     assert isinstance(items[2], Edit) and items[2] == parse_recentchange(first.data)
@@ -270,10 +275,10 @@ async def test_live_reconnects_with_last_event_id_and_backs_off(
     first, second = two_events(sample_path)
     route = respx.get(RECENTCHANGE_URL).mock(
         side_effect=then_fail(
-            httpx.Response(200, content=sse_body([first])),  # a drop after one event
+            sse(sse_body([first])),  # a drop after one event
             httpx.Response(500),
             httpx.Response(500),
-            httpx.Response(200, content=sse_body([second])),
+            sse(sse_body([second])),
         )
     )
     items = await take_until_reconnecting(live, 4)
@@ -288,7 +293,7 @@ async def test_live_reconnects_with_last_event_id_and_backs_off(
         "Edit",
         "reconnecting",
     ]
-    assert [i.retry_in for i in items if isinstance(i, FeedStatus) and i.state == "reconnecting"] == [1, 2, 4, 1]
+    assert [i.retry_in for i in items if isinstance(i, FeedStatus) and i.state == "reconnecting"] == [1, 2, 4, 8]
     assert route.calls[0].request.headers.get("last-event-id") is None
     assert route.calls[1].request.headers["last-event-id"] == first.id
     assert route.calls[3].request.headers["last-event-id"] == first.id
@@ -296,14 +301,33 @@ async def test_live_reconnects_with_last_event_id_and_backs_off(
 
 
 @respx.mock
-async def test_live_backoff_is_capped_at_60_and_resets_after_an_event(live: LiveSource, sample_path: Path) -> None:
+async def test_live_backoff_is_capped_at_60_and_a_short_connection_does_not_reset_it(
+    live: LiveSource, sample_path: Path
+) -> None:
     first, _ = two_events(sample_path)
-    respx.get(RECENTCHANGE_URL).mock(
-        side_effect=then_fail(*[httpx.Response(500)] * 8, httpx.Response(200, content=sse_body([first])))
-    )
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(*[httpx.Response(500)] * 8, sse(sse_body([first]))))
     items = await take_until_reconnecting(live, 11)
     waits = [i.retry_in for i in items if isinstance(i, FeedStatus) and i.state == "reconnecting"]
-    assert waits == [1, 2, 4, 8, 16, 32, 60, 60, 1, 2, 4]
+    assert waits == [1, 2, 4, 8, 16, 32, 60, 60, 60, 60, 60]
+
+
+@respx.mock
+async def test_live_backoff_starts_over_after_a_connection_that_stayed_up_a_minute(
+    live: LiveSource, clock: VirtualClock, sample_path: Path
+) -> None:
+    first, _ = two_events(sample_path)
+    respx.get(RECENTCHANGE_URL).mock(
+        side_effect=then_fail(*[httpx.Response(500)] * 3, sse(sse_body([first])), httpx.Response(500))
+    )
+    waits = []
+    async for item in live.items():
+        if isinstance(item, Edit):
+            clock.advance(61)  # the connection has been up for a minute when it drops
+        if isinstance(item, FeedStatus) and item.state == "reconnecting":
+            waits.append(item.retry_in)
+            if len(waits) == 5:
+                break
+    assert waits == [1, 2, 4, 1, 2]
 
 
 @respx.mock
@@ -312,7 +336,7 @@ async def test_live_rate_limited_waits_at_least_its_retry_after(live: LiveSource
         side_effect=then_fail(
             httpx.Response(429, headers={"Retry-After": "12"}),
             httpx.Response(429, headers={"Retry-After": "1"}),
-            httpx.Response(200, content=b""),
+            sse(b""),
         )
     )
     items = await take_until_reconnecting(live)
@@ -327,7 +351,7 @@ async def test_live_reports_bad_data_once_a_minute_then_ok_again(live: LiveSourc
     first, second = two_events(sample_path)
     bad = RecordedEvent(0, "5", "{not json")
     body = sse_body([first, bad, bad, second, bad])
-    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(httpx.Response(200, content=body)))
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(body)))
     items = await take_until_reconnecting(live)
     assert states(items) == ["connecting", "ok", "Edit", "bad_data", "ok", "Edit", "reconnecting"]
     bad_status = items[3]
@@ -341,7 +365,7 @@ async def test_live_reports_bad_data_again_after_a_minute(
 ) -> None:
     first, _ = two_events(sample_path)
     bad = RecordedEvent(0, "5", "{not json")
-    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(httpx.Response(200, content=sse_body([first, bad, bad]))))
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(sse_body([first, bad, bad]))))
     reports: list[str] = []
     async for item in live.items():
         if isinstance(item, FeedStatus):
@@ -357,7 +381,7 @@ async def test_live_reports_bad_data_again_after_a_minute(
 async def test_live_ignores_events_it_does_not_use_without_calling_them_bad(live: LiveSource) -> None:
     categorize = json.dumps({"type": "categorize", "wiki": "enwiki"})
     body = f"id: 1\ndata: {categorize}\n\nid: 2\ndata: {make_edit()}\n\n".encode()
-    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(httpx.Response(200, content=body)))
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(body)))
     items = await take_until_reconnecting(live)
     assert states(items) == ["connecting", "ok", "Edit", "reconnecting"]
 
@@ -367,7 +391,7 @@ async def test_live_hands_every_raw_event_to_the_recorder(
     client: Client, clock: VirtualClock, sample_path: Path, tmp_path: Path
 ) -> None:
     events, _ = read_all(sample_path)
-    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(httpx.Response(200, content=sse_body(events[:12]))))
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(sse_body(events[:12]))))
     out = tmp_path / "rec" / "out.jsonl.gz"
     source = LiveSource(client, clock, recorder=Recorder(out, clock, None))
     await take_until_reconnecting(source)
@@ -648,3 +672,226 @@ def test_the_sample_has_no_email_or_key_like_strings(sample_path: Path) -> None:
     assert not re.search(r"[A-Fa-f0-9]{32,}", text), "hex key-like string"
     assert not re.search(r"(?=[A-Za-z0-9]*\d)(?=[A-Za-z0-9]*[A-Z])(?=[A-Za-z0-9]*[a-z])[A-Za-z0-9]{32,}", text)
     assert not re.search(r"ghp_|github_pat_|sk-[A-Za-z0-9]|AKIA[A-Z0-9]{8}|xox[bp]-", text), "token prefix"
+
+
+# --- hardening -------------------------------------------------------------------------------------------------------
+
+
+@respx.mock
+async def test_live_keeps_only_a_printable_ascii_last_event_id(live: LiveSource, sample_path: Path) -> None:
+    first, _ = two_events(sample_path)
+    nasty = RecordedEvent(0, "bad\x07id", make_edit())
+    route = respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(sse_body([first, nasty]))))
+    await take_until_reconnecting(live, 2)
+    assert route.calls[1].request.headers["last-event-id"] == first.id  # the control-character id was not kept
+
+
+@respx.mock
+async def test_live_forgets_the_last_event_id_after_a_4xx(live: LiveSource, sample_path: Path) -> None:
+    first, _ = two_events(sample_path)
+    route = respx.get(RECENTCHANGE_URL).mock(
+        side_effect=then_fail(sse(sse_body([first])), httpx.Response(400), sse(b""))
+    )
+    await take_until_reconnecting(live, 3)
+    assert route.calls[1].request.headers["last-event-id"] == first.id
+    assert "last-event-id" not in route.calls[2].request.headers
+
+
+async def test_live_survives_an_url_that_cannot_be_requested(client: Client, clock: VirtualClock) -> None:
+    source = LiveSource(client, clock, url="http://[bad")
+    items = await take_until_reconnecting(source)
+    assert states(items) == ["connecting", "reconnecting"]
+
+
+@respx.mock
+async def test_live_rejects_a_response_that_is_not_an_event_stream(live: LiveSource) -> None:
+    html = httpx.Response(200, content=b"<html>", headers={"Content-Type": "text/html"})
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(html))
+    items = await take_until_reconnecting(live)
+    reconnecting = items[-1]
+    assert isinstance(reconnecting, FeedStatus) and "text/html" in reconnecting.detail
+
+
+@respx.mock
+async def test_live_counts_an_oversize_event_as_bad_data(live: LiveSource) -> None:
+    huge = b"id: 1\ndata: " + b"x" * (2 * 1024 * 1024) + b"\n\n"
+    body = huge + sse_body([RecordedEvent(0, "2", make_edit())])
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(body)))
+    items = await take_until_reconnecting(live)
+    assert states(items) == ["connecting", "bad_data", "ok", "Edit", "reconnecting"]
+
+
+@respx.mock
+async def test_live_drops_canary_events(live: LiveSource) -> None:
+    canary = json.loads(make_edit())
+    canary["meta"] = {"domain": "canary"}
+    body = sse_body([RecordedEvent(0, "1", json.dumps(canary)), RecordedEvent(0, "2", make_edit())])
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(body)))
+    items = await take_until_reconnecting(live)
+    assert states(items) == ["connecting", "ok", "Edit", "reconnecting"]
+
+
+class _Hang(httpx.AsyncByteStream):
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        yield b": hello\n\n"
+        await asyncio.Event().wait()
+
+
+@respx.mock
+async def test_aclose_stops_a_read_in_progress(client: Client, clock: VirtualClock) -> None:
+    respx.get(RECENTCHANGE_URL).mock(
+        return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, stream=_Hang())
+    )
+    source = LiveSource(client, clock)
+    task = asyncio.create_task(take(source, 100))
+    for _ in range(50):
+        await asyncio.sleep(0)
+    assert not task.done()
+    await source.aclose()
+    items = await asyncio.wait_for(task, 5)
+    assert states(items) == ["connecting"]
+
+
+class _StuckClock:
+    """A clock whose sleeps never finish by themselves."""
+
+    def __init__(self, inner: VirtualClock) -> None:
+        self.now = inner.now
+        self.monotonic = inner.monotonic
+
+    async def sleep(self, seconds: float) -> None:
+        await asyncio.Event().wait()
+
+
+@respx.mock
+async def test_aclose_stops_a_backoff_wait(client: Client, clock: VirtualClock) -> None:
+    respx.get(RECENTCHANGE_URL).mock(return_value=httpx.Response(500))
+    source = LiveSource(client, _StuckClock(clock), url=RECENTCHANGE_URL)
+    task = asyncio.create_task(take(source, 100))
+    for _ in range(50):
+        await asyncio.sleep(0)
+    assert not task.done()
+    await source.aclose()
+    items = await asyncio.wait_for(task, 5)
+    assert states(items) == ["connecting", "reconnecting"]
+
+
+# --- replay and recording hardening ----------------------------------------------------------------------------------
+
+
+async def test_a_skip_during_a_sleep_is_not_undone(clock: VirtualClock, tmp_path: Path) -> None:
+    source = ReplaySource(small_recording(tmp_path, [0.0, 10.0, 12.0]), clock)
+
+    async def consume() -> None:
+        async for _item in source.items():
+            pass
+
+    task = asyncio.create_task(consume())
+    for _ in range(3):
+        await asyncio.sleep(0)  # now inside the wait for the second event
+    assert clock.monotonic() > 0
+    source.skip(100)
+    await asyncio.wait_for(task, 5)
+    assert source.moment() >= AT + timedelta(seconds=100)  # not pulled back to the last event's time (12 s)
+
+
+async def test_replay_reads_lazily_and_counts_bad_lines_afterwards(clock: VirtualClock, tmp_path: Path) -> None:
+    path = tmp_path / "lazy.jsonl.gz"
+    write_lines(path, [HEADER, '{"t": 0, "id": null, "data": "{}"}', "garbage", '{"t": 1, "id": null, "data": "{}"}'])
+    source = ReplaySource(path, clock)
+    assert source.skipped_lines == 0  # nothing past the header has been read yet
+    await play(source)
+    assert source.skipped_lines == 1
+
+
+def test_read_recording_skips_non_finite_and_negative_times(tmp_path: Path) -> None:
+    path = tmp_path / "t.jsonl.gz"
+    bad = ['{"t": NaN, "data": "{}"}', '{"t": Infinity, "data": "{}"}', '{"t": -1, "data": "{}"}']
+    write_lines(path, [HEADER, *bad, '{"t": 0, "data": "{}"}'])
+    events, skipped = read_all(path)
+    assert [e.t for e in events] == [0.0]
+    assert skipped == 3
+
+
+def test_read_recording_refuses_an_endless_header_line(tmp_path: Path) -> None:
+    path = tmp_path / "long.jsonl.gz"
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        handle.write("x" * 200_000)
+    with pytest.raises(RecordingError):
+        read_recording(path)
+
+
+def test_read_recording_survives_flipped_bytes(sample_path: Path, tmp_path: Path) -> None:
+    data = bytearray(sample_path.read_bytes())
+    for offset in range(len(data) // 3, len(data) // 3 + 40):
+        data[offset] ^= 0xFF
+    damaged = tmp_path / "flipped.jsonl.gz"
+    damaged.write_bytes(bytes(data))
+    whole, _ = read_all(sample_path)
+    events, skipped = read_all(damaged)  # reads up to the damage
+    assert len(events) < len(whole)
+    assert skipped >= 1
+
+
+def test_read_recording_reports_flipped_bytes_in_the_header(sample_path: Path, tmp_path: Path) -> None:
+    data = bytearray(sample_path.read_bytes())
+    for offset in range(12, 40):
+        data[offset] ^= 0xFF
+    damaged = tmp_path / "header.jsonl.gz"
+    damaged.write_bytes(bytes(data))
+    with pytest.raises(RecordingError):
+        read_recording(damaged)
+
+
+async def test_aclose_between_two_yields_ends_the_replay_cleanly(clock: VirtualClock, tmp_path: Path) -> None:
+    source = ReplaySource(small_recording(tmp_path, [0.0, 0.0, 0.0]), clock)
+    seen = []
+    async for item in source.items():
+        seen.append(item)
+        if isinstance(item, Edit):
+            await source.aclose()  # the next pull must end, not read a closed file
+    assert [type(i).__name__ for i in seen] == ["FeedStatus", "Edit", "FeedStatus"]
+
+
+class _SpyClient:
+    """Wraps a Client and remembers the stream generators it handed out."""
+
+    def __init__(self, inner: Client) -> None:
+        self._inner = inner
+        self.streams: list[AsyncGenerator[SseEvent]] = []
+
+    def stream(self, url: str, last_event_id: str | None = None) -> AsyncGenerator[SseEvent]:
+        generator = self._inner.stream(url, last_event_id)
+        self.streams.append(generator)
+        return generator
+
+
+@respx.mock
+async def test_cancelling_a_consumer_in_a_hung_read_closes_the_stream(client: Client, clock: VirtualClock) -> None:
+    respx.get(RECENTCHANGE_URL).mock(
+        return_value=httpx.Response(200, headers={"Content-Type": "text/event-stream"}, stream=_Hang())
+    )
+    spy = _SpyClient(client)
+    source = LiveSource(spy, clock)  # type: ignore[arg-type]
+    task = asyncio.create_task(take(source, 100))
+    for _ in range(50):
+        await asyncio.sleep(0)
+    assert not task.done() and spy.streams
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert all(generator.ag_frame is None for generator in spy.streams)  # closed, not left running
+
+
+@respx.mock
+async def test_canary_events_are_not_recorded(client: Client, clock: VirtualClock, tmp_path: Path) -> None:
+    canary = json.loads(make_edit())
+    canary["meta"] = {"domain": "canary"}
+    body = sse_body([RecordedEvent(0, "1", json.dumps(canary)), RecordedEvent(0, "2", make_edit())])
+    respx.get(RECENTCHANGE_URL).mock(side_effect=then_fail(sse(body)))
+    out = tmp_path / "canary.jsonl.gz"
+    source = LiveSource(client, clock, recorder=Recorder(out, clock, None))
+    await take_until_reconnecting(source)
+    await source.aclose()
+    recorded, _ = read_all(out)
+    assert [e.id for e in recorded] == ["2"]

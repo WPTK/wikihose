@@ -160,12 +160,30 @@ def _move(data: dict[str, Any]) -> PageMove:
     )
 
 
+def is_canary(raw: str) -> bool:
+    """True for one of Wikimedia's canary events (see ``parse_event``)."""
+    if '"canary"' not in raw:  # cheap test first; almost no event is a canary
+        return False
+    try:
+        data = json.loads(raw)
+    except (ValueError, RecursionError):
+        return False
+    meta = data.get("meta") if isinstance(data, dict) else None
+    return isinstance(meta, dict) and meta.get("domain") == "canary"
+
+
 def parse_event(raw: str) -> tuple[Edit | PageMove | None, bool]:
     """Parse one event. Returns ``(item, well_formed)``; ``item`` is None for events the app does not use."""
     try:
         data = json.loads(raw)
         if not isinstance(data, dict):
             raise _Malformed
+        meta = data.get("meta")
+        # Canary events are artificial events Wikimedia mixes into the public streams to tell a broken stream from an
+        # empty one. Its EventStreams page (wikitech.wikimedia.org/wiki/Event_Platform/EventStreams, "Canary Events")
+        # says to discard every event whose meta.domain is "canary".
+        if isinstance(meta, dict) and meta.get("domain") == "canary":
+            return None, True
         kind = data.get("type")
         if not isinstance(kind, str):
             raise _Malformed

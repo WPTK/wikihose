@@ -5,7 +5,8 @@ logs). Without them the platform user directories apply; on Windows those come f
 (platformdirs asks the shell instead, so a test could not move them). Nothing here creates a directory.
 """
 
-# Adapted from earthwave (C:\earthwave) paths.py at commit 2b4fe0a49844619ae217f6eec02061b6bc2d5830.
+# Adapted from earthwave (https://github.com/WPTK/earthwave) paths.py at commit
+# 2b4fe0a49844619ae217f6eec02061b6bc2d5830.
 
 from __future__ import annotations
 

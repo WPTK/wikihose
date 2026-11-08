@@ -8,6 +8,8 @@ exist; the watchlist and pageview methods arrive with the features that use them
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 SCHEMA_V1 = [
@@ -37,7 +39,7 @@ class Store:
     def __init__(self, path: Path | str) -> None:
         if isinstance(path, Path):
             path.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(path)
+        self._db = sqlite3.connect(path, isolation_level=None)  # autocommit; transactions are explicit
         self._db.execute("PRAGMA foreign_keys = ON")
         self._db.execute("PRAGMA journal_mode = WAL")  # stays "memory" for :memory:, which is fine
         self._migrate()
@@ -47,10 +49,19 @@ class Store:
         if version > SCHEMA_VERSION:
             raise RuntimeError(f"database is version {version}; this wikihose understands up to {SCHEMA_VERSION}")
         for step in range(version, SCHEMA_VERSION):
-            with self._db:
+            self._db.execute("BEGIN")
+            try:
                 for statement in MIGRATIONS[step]:
                     self._db.execute(statement)
                 self._db.execute(f"PRAGMA user_version = {step + 1}")
+                self._db.execute("COMMIT")
+            except BaseException:
+                self._rollback()
+                raise
+
+    def _rollback(self) -> None:
+        with suppress(sqlite3.Error):  # nothing to undo if SQLite already ended the transaction
+            self._db.execute("ROLLBACK")
 
     def schema_version(self) -> int:
         return int(self._db.execute("PRAGMA user_version").fetchone()[0])
@@ -67,7 +78,7 @@ class Store:
         bytes_removed: int = 0,
     ) -> None:
         """Add to the counters for one page in one UTC minute (an ISO minute such as 2026-11-07T14:05)."""
-        with self._db:
+        with self._transaction():
             self._db.execute(
                 "INSERT INTO edit_minutes (wiki, page, minute, edits, human_edits, bytes_added, bytes_removed) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?) "
@@ -89,8 +100,18 @@ class Store:
 
     def prune_edit_minutes(self, before: str) -> int:
         """Delete rows for minutes earlier than ``before``; returns how many."""
-        with self._db:
+        with self._transaction():
             return self._db.execute("DELETE FROM edit_minutes WHERE minute < ?", (before,)).rowcount
+
+    @contextmanager
+    def _transaction(self) -> Iterator[None]:
+        self._db.execute("BEGIN")
+        try:
+            yield
+            self._db.execute("COMMIT")
+        except BaseException:
+            self._rollback()
+            raise
 
     def close(self) -> None:
         self._db.close()
