@@ -59,7 +59,8 @@ Commit subjects are plain imperative sentences, such as "Add the watchlist badge
 
 Versions follow [ZeroVer](https://0ver.org): `0.MINOR.PATCH`, and the major version never becomes 1. `__version__` in
 `src/wikihose/__init__.py` is edited by hand: minor for features, patch for fixes. Release tags are `v0.x.y` and match
-`__version__`.
+`__version__`. Before tagging, put the release date in place of `Unreleased` in that version's changelog heading
+(`## [0.1.0] - 2026-11-09`) in its own PR; `release.yml` refuses a heading that still says Unreleased.
 
 `CHANGELOG.md` follows [Common Changelog](https://common-changelog.org/). Add an entry only for user-visible changes,
 as one imperative line with a `(#PR)` reference under Changed, Added, Removed or Fixed, in that order. Docs, dotfiles,
