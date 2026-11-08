@@ -456,7 +456,13 @@ class LiveTab(Vertical):
             self._refill()  # adds what arrived while paused
         self._draw_filters()
 
+    def check_action(self, action: str, _parameters: tuple[object, ...]) -> bool | None:
+        # the demo recording is English Wikipedia only
+        return not (action == "change_wiki" and getattr(self.app, "loop_replay", False))
+
     def action_change_wiki(self) -> None:
+        if getattr(self.app, "loop_replay", False):
+            return
         self.app.push_screen(WikiPrompt(), self.set_wiki)
 
     def set_wiki(self, wiki: str | None) -> None:
@@ -465,7 +471,12 @@ class LiveTab(Vertical):
             return
         self._stats.flush(self._store)
         self.wiki = wiki
-        self._stats = LiveStats(wiki, self._clock)
+        self.start_over()
+        self.post_message(self.WikiChanged(wiki))
+
+    def start_over(self) -> None:
+        """Empty the log and start the numbers from zero, for the wiki now selected."""
+        self._stats = LiveStats(self.wiki, self._clock)
         self._ring.clear()
         self._pending.clear()
         self._rows.clear()
@@ -474,7 +485,6 @@ class LiveTab(Vertical):
         self._draw_filters()
         self._draw_log()
         self.refresh_side()
-        self.post_message(self.WikiChanged(wiki))
 
     # --- the diff of an edit -----------------------------------------------------------------------------------------
 

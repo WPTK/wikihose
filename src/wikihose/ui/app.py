@@ -37,6 +37,7 @@ from wikihose.ui.bindings import declared_bindings, help_text, key_label
 from wikihose.ui.dialogs import FIXED_HELP, AddPage, HelpScreen
 from wikihose.ui.tabs.diff import DiffTab, OpenDiff
 from wikihose.ui.tabs.live import LiveTab
+from wikihose.ui.tabs.reading import Factory, ReadingTab
 from wikihose.ui.tabs.stub import STUBS, StubPane
 from wikihose.ui.tabs.watchlist import WatchlistTab
 from wikihose.ui.theme import THEMES
@@ -89,7 +90,7 @@ class MainScreen(Screen[None]):
             with TabPane("Live", id="live"):
                 yield LiveTab(shell.config, shell.clock, shell.tz, shell.store, shell.watchlist, shell.subscribe)
             with TabPane("Reading", id="reading"):
-                yield StubPane(STUBS["reading"][1])
+                yield ReadingTab(shell.reading, shell.wiki)
             with TabPane("Watchlist", id="watchlist"):
                 yield WatchlistTab(shell.watchlist, shell.tz, shell.last_editor)
             with TabPane("Diff", id="diff"):
@@ -155,6 +156,13 @@ class MainScreen(Screen[None]):
     def refresh_top_bar(self) -> None:
         self.query_one(TopBar).refresh_text()
 
+    def start_over(self) -> None:
+        """A looping replay began again: the Live tab's numbers start from zero."""
+        self.query_one(LiveTab).start_over()  # not the app's query_one: a dialog may be the active screen
+
+    def set_reading_wiki(self, wiki: str) -> None:
+        self.query_one(ReadingTab).set_wiki(wiki)
+
 
 class WikihoseApp(App[None]):
     TITLE = "wikihose"
@@ -192,6 +200,8 @@ class WikihoseApp(App[None]):
         store: Store | None = None,
         config_path: Path | None = None,
         client: Client | None = None,
+        reading: Factory | None = None,
+        loop_replay: bool = False,
     ) -> None:
         super().__init__()
         self.source = source
@@ -199,6 +209,7 @@ class WikihoseApp(App[None]):
         self.clock = clock
         self.tz: tzinfo = tz or datetime.now().astimezone().tzinfo or UTC
         self.store = store
+        self.reading: Factory = reading or (lambda _wiki: None)  # wiki -> Reading data; None in a replay
         self.config_path = config_path  # None: never write the config (--no-config)
         self.wiki = config.wiki
         self.client = client  # None in a replay: no network, so nothing to add and no catch-up
@@ -209,6 +220,7 @@ class WikihoseApp(App[None]):
         self._tab = "live"
         self._previous_tab = "live"
         self.replay_finished = False
+        self.loop_replay = loop_replay  # the demo: start the replay over when it ends, with an empty log
         self._subscribers: list[Callable[[StreamItem], None]] = []
         self._main = MainScreen(self)
         for theme in THEMES:
@@ -243,14 +255,22 @@ class WikihoseApp(App[None]):
         self._subscribers.append(callback)
 
     async def _pump(self) -> None:
-        async for item in self.source.items():
-            self._dispatch(item)
+        while True:
+            async for item in self.source.items():
+                self._dispatch(item)
+            if not (self.loop_replay and isinstance(self.source, ReplaySource)):
+                return
+            if not self.source.rewind():
+                return  # closed while it played
+            self._on_main(self._main.start_over)
+            self._on_main(self._main.refresh_top_bar)
 
     def _dispatch(self, item: StreamItem) -> None:
         if isinstance(item, FeedStatus):
             if isinstance(self.source, ReplaySource) and item.state == "down" and item.detail == REPLAY_FINISHED:
-                self.replay_finished = True  # the end of a recording is not a failure
-                self._on_main(self._main.refresh_top_bar)
+                if not self.loop_replay:
+                    self.replay_finished = True  # the end of a recording is not a failure
+                    self._on_main(self._main.refresh_top_bar)
             else:
                 self._on_main(self._main.handle_status, item)
             return
@@ -461,6 +481,7 @@ class WikihoseApp(App[None]):
     def on_live_tab_wiki_changed(self, message: LiveTab.WikiChanged) -> None:
         self.wiki = message.wiki
         self._on_main(self._main.set_wiki, message.wiki)
+        self._on_main(self._main.set_reading_wiki, message.wiki)
         self.update_config(wiki=message.wiki)
 
     def update_config(self, **changes: Any) -> None:

@@ -63,3 +63,15 @@ live" with the state (paused, a speed, or replay finished). Keys, shown only in 
 - `]` skips ahead 60 seconds
 
 `--headless-seconds N` plays the recording with no screen and prints a one-line summary.
+
+## The demo
+
+`wikihose --demo` plays `src/wikihose/data/demo-enwiki.jsonl.gz`, which ships in the wheel: six minutes of the real
+English Wikipedia (`enwiki`) stream, recorded on 7 November 2026 (about 00:59 to 01:05 UTC on 8 November), 1,822 events.
+It runs at 1x through `ReplaySource` and never touches the network: no HTTP client and no live source are built. It
+uses your theme but always watches `enwiki`, and it never writes the config file or the database. The top bar says
+"Recorded data, not live". When the recording ends it starts again from the top with an empty log and fresh numbers, so
+a demo left open keeps moving (a `--replay FILE` run stops at "replay finished" instead). `--demo` cannot be combined
+with `--replay`, `--record`, `--wiki` or `--speed`; the replay keys (space, `+`, `-`, `]`) work as in any replay.
+
+The recording is Wikimedia data under CC BY-SA 4.0; see [NOTICE](../NOTICE).

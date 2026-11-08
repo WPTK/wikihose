@@ -97,7 +97,7 @@ async def test_clicking_the_live_tab_puts_the_focus_in_it(clock: VirtualClock) -
         assert app.focused.id == "log"
 
 
-@pytest.mark.parametrize("tab", ["reading", "convergence"])
+@pytest.mark.parametrize("tab", ["convergence"])
 async def test_stub_panes_say_what_is_coming(clock: VirtualClock, tab: str) -> None:
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
@@ -248,7 +248,7 @@ async def test_help_lists_the_replay_keys_only_in_a_replay(clock: VirtualClock) 
 async def test_help_on_another_tab_does_not_list_the_live_keys(clock: VirtualClock) -> None:
     app = app_with(clock)
     async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.press("2")
+        await pilot.press("3")
         await pilot.press("question_mark")
         await pilot.pause()
         assert help_keys(app) == ["w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]

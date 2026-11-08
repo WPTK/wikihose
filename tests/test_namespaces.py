@@ -80,7 +80,10 @@ def test_accepts_formatversion_2_shapes() -> None:
 def test_never_raises_and_a_plain_title_is_kept(title: str) -> None:
     flt = NamespaceFilter(frozenset({"special"}), "main page")
     flt.is_article(title)
-    if ":" not in title and title.strip() and title.strip().casefold() != "main page":
+    spaced = " ".join(
+        title.replace("_", " ").split()
+    )  # underscores are spaces in a title, and a blank title is no page at all
+    if ":" not in title and spaced and spaced.casefold() != "main page":
         assert flt.is_article(title)
 
 

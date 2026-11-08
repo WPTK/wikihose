@@ -18,7 +18,7 @@ import statistics
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import quote
 
 from wikihose.clock import Clock
@@ -157,6 +157,16 @@ def parse_summary(payload: Any) -> Summary | None:
     return Summary(title, description if isinstance(description, str) else "", extract.strip())
 
 
+class ReadingSource(Protocol):
+    """What the Reading tab needs; ``ReadingData`` is the real one and tests pass a fake."""
+
+    day: date | None  # the newest day ranked, set by ``load``
+
+    async def load(self, progress: Progress | None = None) -> list[SpikeRow]: ...
+
+    async def summary(self, title: str) -> Summary | None: ...
+
+
 class ReadingData:
     """Loads and ranks the Reading tab's rows for one wiki."""
 
@@ -176,6 +186,7 @@ class ReadingData:
         self._host = f"{wiki.removesuffix('wiki').replace('_', '-')}.wikipedia.org"
         self._min_views = min_views
         self._exact_count = exact_count
+        self.day: date | None = None
         self._filter: NamespaceFilter | None = None
         self._tops: dict[date, dict[str, int]] = {}  # past days never change, so they are kept for the session
         self._histories: dict[tuple[str, date], list[int] | None] = {}  # None: the API has no data for the page
@@ -219,6 +230,7 @@ class ReadingData:
         if newest is None:
             return []
         today, todays = newest
+        self.day = today
         first = today - timedelta(days=DAYS - 1)
         earlier_days = [first + timedelta(days=n) for n in range(DAYS - 1)]
         total = len(earlier_days) + self._exact_count
