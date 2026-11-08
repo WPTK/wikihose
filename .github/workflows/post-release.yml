@@ -82,7 +82,7 @@ jobs:
         wikihose-${{ needs.tag.outputs.version }}-macos-arm64.tar.gz
         wikihose-${{ needs.tag.outputs.version }}-macos-x86_64.tar.gz
       smoke-command: |
-        out=$("$BIN" --version); echo "$out"
+        out=$("$BIN" --version | tr -d '\r'); echo "$out"
         [ "$out" = "wikihose ${{ needs.tag.outputs.version }}" ] || { echo "::error::expected 'wikihose ${{ needs.tag.outputs.version }}'"; exit 1; }
         "$BIN" --selftest
 
