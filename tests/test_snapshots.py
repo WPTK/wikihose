@@ -24,7 +24,7 @@ from wikihose.sources.replay import ReplaySource
 from wikihose.store import Store
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.tabs.diff import DiffTab
-from wikihose.ui.tabs.watchlist import WatchlistTab, page_key_of
+from wikihose.ui.tabs.watchlist import WatchlistTab, trend_key
 
 Before = Callable[[Any], Awaitable[None]]
 
@@ -129,7 +129,7 @@ async def watchlist_with_trends(pilot: Any) -> None:
     tab = pilot.app.query_one(WatchlistTab)
     series = [tuple(range(1, 31)), tuple(range(30, 0, -1))]
     for index, page in enumerate(pilot.app.watchlist.pages()):
-        tab._series[page_key_of(page)] = series[index] if index < len(series) else None
+        tab._series[trend_key(page)] = series[index] if index < len(series) else None
     tab.refresh_rows()
     await pilot.pause()
 

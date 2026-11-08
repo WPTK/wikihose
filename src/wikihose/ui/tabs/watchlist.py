@@ -15,6 +15,7 @@ from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.timer import Timer
 from textual.widgets import DataTable, Static
 
@@ -25,7 +26,6 @@ from wikihose.titles import article_url, host_for_wiki
 from wikihose.trend import Trends
 from wikihose.ui.dialogs import ConfirmRemove
 from wikihose.ui.tabs.diff import DiffRequest, OpenDiff
-from wikihose.ui.tabs.reading import describe
 from wikihose.ui.widgets import spark
 from wikihose.watchlist import Watchlist
 
@@ -45,6 +45,19 @@ EMPTY = (
 
 def page_key_of(page: WatchedPage) -> str:
     return f"{page.wiki}:{page.page_id}"
+
+
+def trend_key(page: WatchedPage) -> tuple[str, str]:
+    """A trend belongs to a title: a renamed page is fetched again."""
+    return page_key_of(page), page.title
+
+
+def describe_trend(error: FetchError, title: str) -> str:
+    if error.kind == "rate_limited":
+        return f"Pageviews: rate limited, retrying in {int(error.retry_after or 5)}s"
+    if error.kind == "down":
+        return "Pageviews: could not reach Wikimedia. Trends will load when you open this tab again."
+    return f"Pageviews: Wikimedia sent something unexpected for {title}. Its trend is left blank."
 
 
 class WatchlistTab(Vertical):
@@ -72,7 +85,9 @@ class WatchlistTab(Vertical):
         self._pending = False  # a redraw is already queued
         self._layout: tuple[bool, int] | None = None  # (wide, title width) the columns were built for
         self._trends = trends
-        self._series: dict[str, tuple[int, ...] | None] = {}  # page key -> 30 days of views; None: no data
+        self._series: dict[
+            tuple[str, str], tuple[int, ...] | None
+        ] = {}  # (page key, title) -> 30 days of views; None: no data
         self._filling = False  # the trend worker is running, so a page without a trend yet shows "·"
         self._shown = False
         self._retry: Timer | None = None
@@ -84,6 +99,7 @@ class WatchlistTab(Vertical):
 
     def on_mount(self) -> None:
         self._watchlist.subscribe(self._schedule_refresh)
+        self._watchlist.subscribe_members(self._start_fill)
         self.refresh_rows()
 
     def on_resize(self, event: events.Resize) -> None:
@@ -98,45 +114,52 @@ class WatchlistTab(Vertical):
 
     def on_hide(self) -> None:
         self._shown = False
+        self.workers.cancel_group(self, "trend")
+        if self._retry is not None:
+            self._retry.stop()
+            self._retry = None
 
     # --- the trend column --------------------------------------------------------------------------------------------
 
     def _say(self, text: str) -> None:
-        status = self.query_one("#watch-status", Static)
+        try:
+            status = self.query_one("#watch-status", Static)
+        except NoMatches:  # the app is quitting
+            return
         status.display = bool(text)
         status.update(Text(text, no_wrap=True, overflow="ellipsis"))
 
     def _start_fill(self) -> None:
-        """Fetch the missing trends, one page at a time, when the column is on screen. A restart skips what is done."""
+        """Fetch the missing trends, one page at a time, when the column is on screen. A running fill is left alone."""
+        if self._trends is None or not self._shown or not self._layout or not self._layout[0]:
+            return
+        if any(w.group == "trend" and not w.is_finished for w in self.workers):
+            return  # it picks up pages added meanwhile
         if self._retry is not None:
             self._retry.stop()
             self._retry = None
-        if self._trends is None or not self._shown or not self._layout or not self._layout[0]:
-            return
-        if all(page_key_of(page) in self._series for page in self._watchlist.pages()):
+        if all(trend_key(page) in self._series for page in self._watchlist.pages()):
             return
         job = partial(self._fill, self._trends)
         self.run_worker(job, name="trend", group="trend", exclusive=True)  # type: ignore[arg-type]
 
+    def _next_missing(self) -> WatchedPage | None:
+        return next((page for page in self._watchlist.pages() if trend_key(page) not in self._series), None)
+
     async def _fill(self, trends: Trends) -> None:
         self._filling = True
-        self.refresh_rows()
+        self._say("")
+        self._schedule_refresh()
         try:
-            first = True
-            for page in self._watchlist.pages():
-                key = page_key_of(page)
-                if key in self._series:
-                    continue
+            while (page := self._next_missing()) is not None:
+                key = trend_key(page)
                 if not trends.supported(page):
                     self._series[key] = None
                     continue
-                if not first:
-                    await trends.pause()
-                first = False
                 try:
                     self._series[key] = await trends.fetch(page)
                 except FetchError as error:
-                    self._say(describe(error))
+                    self._say(describe_trend(error, page.title))
                     if error.kind == "bad_data":  # one odd page must not block the rest
                         self._series[key] = None
                         continue
@@ -144,13 +167,12 @@ class WatchlistTab(Vertical):
                         self._retry = self.set_timer(max(error.retry_after or 5, 1), self._start_fill)
                     return
                 self._schedule_refresh()
-            self._say("")
         finally:
             self._filling = False
-            self.refresh_rows()
+            self._schedule_refresh()
 
     def _trend_cell(self, page: WatchedPage) -> Text:
-        key = page_key_of(page)
+        key = trend_key(page)
         if key not in self._series:
             return Text("·" if self._filling else "-", style="dim")
         series = self._series[key]
@@ -174,7 +196,10 @@ class WatchlistTab(Vertical):
     def refresh_rows(self) -> None:
         if not self.is_mounted:
             return
-        table = self.query_one("#watch-table", DataTable)
+        try:
+            table = self.query_one("#watch-table", DataTable)
+        except NoMatches:  # the app is quitting
+            return
         pages = self._watchlist.pages()
         self.query_one("#watch-empty", Static).display = not pages
         table.display = bool(pages)

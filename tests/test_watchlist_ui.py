@@ -47,9 +47,11 @@ PAGEVIEWS = r".*/metrics/pageviews/per-article/.*"
 
 
 @pytest.fixture(autouse=True)
-def _no_pageviews() -> None:
+def _no_pageviews() -> Iterator[None]:
     """Showing the tab asks Pageviews for each page's trend; these tests are about other things, so there is none."""
-    respx.get(url__regex=PAGEVIEWS).mock(return_value=httpx.Response(404))
+    with respx.mock:
+        respx.get(url__regex=PAGEVIEWS).mock(return_value=httpx.Response(404))
+        yield
 
 
 def watch_ada(store: Store, clock: VirtualClock, *, unseen: int = 0) -> None:

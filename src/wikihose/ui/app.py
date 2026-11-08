@@ -132,7 +132,9 @@ class MainScreen(Screen[None]):
         if pane is None:
             return
         for widget in pane.query("*"):
-            if widget.focusable:
+            # A table with nothing to show is hidden with display: none, which "focusable" does not look at; focusing it
+            # leaves the focus on a widget that is not there until the screen next drops it (and its keys show in help).
+            if widget.focusable and all(w.display for w in widget.ancestors_with_self):
                 widget.focus()
                 return
 

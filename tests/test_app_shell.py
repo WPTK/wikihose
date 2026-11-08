@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
 import pytest
 import respx
 from support import (
@@ -254,6 +255,16 @@ async def test_help_on_another_tab_does_not_list_the_live_keys(clock: VirtualClo
         assert help_keys(app) == ["w", "W", "?", "q", "1-5", "Enter", "Tab", "Mouse"]
 
 
+async def test_an_empty_watchlist_tab_takes_no_focus(clock: VirtualClock) -> None:
+    """Its table is hidden, so the focus stays off it and the tab's m, d and Delete keys do not reach the help screen."""
+    app = app_with(clock)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.press("3")
+        app.screen.focus_active_pane()
+        await pilot.pause()
+        assert app.focused is None
+
+
 @pytest.mark.parametrize("closer", ["escape", "question_mark", "button"])
 async def test_help_closes(clock: VirtualClock, closer: str) -> None:
     app = app_with(clock)
@@ -416,6 +427,7 @@ async def test_w_anywhere_else_opens_the_dialog_and_adds_what_you_type(
     clock: VirtualClock, client: Client, tab_key: str
 ) -> None:
     action_api((974, "Ada Lovelace", 500))
+    respx.get(url__regex=r".*/metrics/pageviews/per-article/.*").mock(return_value=httpx.Response(404))
     app = app_with(clock, client=client)  # no edits, so the Live tab has no row to add either
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.press(tab_key)

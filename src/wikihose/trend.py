@@ -29,15 +29,13 @@ class Trends:
         self._client = client
         self._clock = clock
         self._sources: dict[str, ReadingData] = {}
+        self._asked = False  # a request has gone out, so the next one waits
 
     @staticmethod
     def supported(page: WatchedPage) -> bool:
         """Pageviews exist for Wikipedia editions only; Wiktionary and the rest are skipped."""
         host = host_for_wiki(page.wiki)
         return host is not None and host.endswith(".wikipedia.org")
-
-    async def pause(self) -> None:
-        await self._clock.sleep(PAUSE)
 
     def _today(self) -> date:
         return self._clock.now().astimezone(UTC).date()
@@ -68,6 +66,9 @@ class Trends:
         series, fresh = self.cached(page)
         if fresh or self._client is None:
             return series
+        if self._asked:
+            await self._clock.sleep(PAUSE)  # only a request waits; a page served from the store does not
+        self._asked = True
         last = self._today() - timedelta(days=1)
         first = last - timedelta(days=DAYS - 1)
         source = self._sources.get(page.wiki)
