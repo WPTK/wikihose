@@ -13,6 +13,13 @@ These are done on pypi.org and github.com, never by a workflow:
 2. On pypi.org, add a pending trusted publisher for the project `wikihose`: owner `WPTK`, repository `wikihose`,
    workflow `release.yml`, environment `pypi`.
 
+3. Restrict who and what can release. The workflow's own checks run from the tagged commit, so they only help if the
+   tag itself is controlled:
+   - On the `pypi` environment, set "Deployment branches and tags" to selected tags with the pattern `v*`, and turn off
+     "Allow administrators to bypass".
+   - Add a tag ruleset on `refs/tags/v*` that limits creating, updating and deleting those tags to the owner.
+   - Keep branch protection on `main`.
+
 There are no API tokens or repository secrets anywhere. PyPI trusts the workflow's identity (OIDC) instead.
 
 ## Cut a release
@@ -30,7 +37,8 @@ There are no API tokens or repository secrets anywhere. PyPI trusts the workflow
 
 If the run fails before the `publish` job, nothing was released: fix the cause, delete the tag
 (`git push origin :refs/tags/v0.x.y`, `git tag -d v0.x.y`) and tag again. If a release was created and is bad, mark it
-as a draft or delete it and fix forward with a patch version. PyPI refuses a second upload of the same version.
+as a draft or delete it and fix forward with a patch version. If only the `pypi` job failed (the GitHub release exists but PyPI has nothing), fix the cause and use "Re-run failed
+jobs" on the run; do not retag. PyPI refuses a second upload of the same version.
 
 ## What the workflows do
 
@@ -50,8 +58,8 @@ as a draft or delete it and fix forward with a patch version. PyPI refuses a sec
 build is proved without a release. It publishes nothing and has no secrets. `post-release.yml` can be run by hand
 against an existing tag (input `tag`).
 
-All third-party actions are pinned to a commit SHA. Dependencies for the builds are pinned by
-`.github/release-constraints.txt`, so a dependency release between two tags cannot change what ships.
+All third-party actions are pinned to a commit SHA. Dependencies for the builds, including the
+build backend (hatchling), are pinned by `.github/release-constraints.txt`, so a dependency release between two tags cannot change what ships.
 
 ## Build the Windows executable locally
 
@@ -68,5 +76,5 @@ The script runs PyInstaller (output in `dist\`, work files in `.pyi-build\`, bot
 
 ```powershell
 (Get-FileHash .\wikihose-0.1.0-windows-x86_64.exe -Algorithm SHA256).Hash.ToLower()   # compare with SHA256SUMS
-gh attestation verify .\wikihose-0.1.0-windows-x86_64.exe --repo WPTK/wikihose
+gh attestation verify .\wikihose-0.1.0-windows-x86_64.exe --repo WPTK/wikihose --signer-workflow WPTK/wikihose/.github/workflows/release.yml
 ```

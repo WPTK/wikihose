@@ -1,6 +1,6 @@
 # Exact versions the release builds with (pip -c). Only constrains; it installs nothing by itself, so Windows-only
 # entries are harmless elsewhere. Regenerate before a release when a dependency moved (see docs/release.md):
-#   python -m venv v; v\Scripts\pip install . "pyinstaller>=6.22,<7" "build>=1.6.1,<2"; v\Scripts\pip freeze --exclude wikihose
+#   python -m venv v; v\Scripts\pip install . "pyinstaller>=6.22,<7" "build>=1.6.1,<2" "hatchling>=1.33.0"; v\Scripts\pip freeze --exclude wikihose
 altgraph==0.17.5
 anyio==4.16.0
 anysqlite==0.0.5
@@ -33,3 +33,8 @@ textual==8.2.8
 tomli_w==1.2.0
 typing_extensions==4.16.0
 tzdata==2026.6
+hatchling==1.33.0
+pathspec==1.1.1
+pluggy==1.7.0
+tomlkit==0.15.2
+trove-classifiers==2026.9.21.13

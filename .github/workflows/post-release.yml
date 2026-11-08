@@ -31,7 +31,14 @@ jobs:
   tag:
     name: Resolve the tag
     # A workflow_run for a failed Release run published nothing, so there is nothing to check.
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # Only a push-triggered run of this repository's own release.yml counts; a fork's workflow that is merely named
+    # "Release" does not.
+    if: >-
+      github.event_name != 'workflow_run' || (
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.path == '.github/workflows/release.yml')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -56,6 +63,9 @@ jobs:
     needs: tag
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
     env:
       TAG: ${{ needs.tag.outputs.tag }}
       VERSION: ${{ needs.tag.outputs.version }}
@@ -79,7 +89,7 @@ jobs:
         run: |
           cd dl
           for f in $(awk '{print $2}' SHA256SUMS | sed 's/^\*//'); do
-            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" || { echo "::error::no valid attestation for $f"; exit 1; }
+            gh attestation verify "$f" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/release.yml" --source-ref "refs/tags/$TAG" || { echo "::error::no valid attestation for $f"; exit 1; }
           done
       - name: Check the wheel, sdist and executable are for this version
         run: |

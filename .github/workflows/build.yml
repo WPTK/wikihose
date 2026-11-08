@@ -18,6 +18,10 @@ on:
 permissions:
   contents: read
 
+# Pins the isolated build environment too (hatchling and its dependencies), which a -c on the command line does not.
+env:
+  PIP_CONSTRAINT: ${{ github.workspace }}/.github/release-constraints.txt
+
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
