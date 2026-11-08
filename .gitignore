@@ -8,6 +8,7 @@ __pycache__/
 .hypothesis/
 .coverage
 htmlcov/
+snapshot_report.html
 
 # Environments
 .venv/

@@ -1,2 +1,4 @@
-* text=auto
+* text=auto eol=lf
+*.gz binary
+*.svg text eol=lf
 tests/fixtures/** -text

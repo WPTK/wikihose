@@ -2,8 +2,8 @@
 
 Thanks for helping with wikihose. For anything larger than a typo, open an issue first so the change can be agreed
 before you write it. What the app is meant to be is in [docs/design.md](docs/design.md); where its data comes from and
-the request limits are in [docs/data-sources.md](docs/data-sources.md). `docs/development.md` (layout, test tooling,
-the CI gates table) is added with the project scaffold.
+the request limits are in [docs/data-sources.md](docs/data-sources.md). [docs/development.md](docs/development.md) covers
+the package layout, test tooling and the CI gates table.
 
 ## Setup
 
