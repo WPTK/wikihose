@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sqlite3
 import sys
 from collections.abc import Sequence
 from contextlib import ExitStack
@@ -20,7 +21,6 @@ from wikihose.paths import db_path, log_dir
 if TYPE_CHECKING:
     from wikihose.clock import Clock
     from wikihose.net import Client
-    from wikihose.store import WatchedPage
     from wikihose.ui.tabs.reading import Factory
 
 DEMO_WIKI = "enwiki"
@@ -107,16 +107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         config = replace(config, wiki=args.wiki)
     if args.demo:
         config = replace(config, wiki=DEMO_WIKI)
-        config_path = None  # the demo never writes the config
     return asyncio.run(run(args, config, config_path))
-
-
-def _saved_watchlist() -> list[WatchedPage]:
-    """The reader's watched pages for a replay, which gets them read-only. Nothing when there is no database yet."""
-    from wikihose.store import read_saved_watchlist
-
-    path = db_path()
-    return read_saved_watchlist(path) if path.exists() else []
 
 
 def reading_factory(client: Client | None, clock: Clock) -> Factory | None:
@@ -182,9 +173,16 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
         from wikihose.store import Store
         from wikihose.ui.app import WikihoseApp
 
-        replaying = args.replay is not None or args.demo
-        store = None if replaying else Store(db_path())  # a replay must not add old edits to the database
-        saved = _saved_watchlist() if replaying else []
+        # The reader's watchlist is saved in every mode; a recording's edits and counts never reach the database.
+        try:
+            store = Store(db_path(), history=not (args.replay is not None or args.demo))
+        except (
+            OSError,
+            sqlite3.Error,
+            RuntimeError,
+        ) as exc:  # unwritable folder, corrupt or newer file
+            print(f"wikihose: cannot open the database at {db_path()} ({exc})", file=sys.stderr)
+            return 1
         try:
             app = WikihoseApp(
                 source,
@@ -195,12 +193,10 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
                 reading=demo_reading_factory() if args.demo else reading_factory(client, clock),
                 client=client,
                 loop_replay=args.demo,
-                saved_watchlist=saved,
             )
             await app.run_async()
         finally:
-            if store is not None:
-                store.close()
+            store.close()
         return 0
     finally:
         await source.aclose()

@@ -25,6 +25,7 @@ from wikihose.clock import VirtualClock
 from wikihose.config import Config
 from wikihose.sources.recording import demo_recording, read_recording
 from wikihose.sources.replay import ReplaySource
+from wikihose.store import Store
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.bars import TopBar
 from wikihose.ui.tabs.live import LiveTab
@@ -64,7 +65,15 @@ async def capture(size: tuple[int, int] = SIZE, tab: int | None = None) -> str:
         source = ReplaySource(path, clock)
     config = Config(theme="wikihose-dark", wiki="enwiki")
     reading = demo_reading_factory()  # what --demo shows on the Reading and Convergence tabs
-    app = WikihoseApp(source, config, clock=clock, tz=TIMEZONE, loop_replay=True, reading=reading)
+    app = WikihoseApp(
+        source,
+        config,
+        clock=clock,
+        tz=TIMEZONE,
+        loop_replay=True,
+        reading=reading,
+        store=Store(":memory:", history=False),
+    )
     async with app.run_test(size=size) as pilot:
         await asyncio.wait_for(_until_parked(clock, pilot), timeout=120)
         live = app.query_one(LiveTab)

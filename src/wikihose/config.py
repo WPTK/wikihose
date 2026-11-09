@@ -17,6 +17,7 @@ import tomli_w
 
 from wikihose.paths import config_dir
 
+READING_ROW_STEPS = (25, 50, 100)  # the Reading tab's row counts; the first is the default
 WIKI_PATTERN = re.compile(r"[a-z_]+wiki")
 
 
@@ -33,6 +34,7 @@ class Config:
     hide_bots: bool = True
     articles_only: bool = True
     min_bytes: int = 0
+    reading_rows: int = 25  # rows the Reading tab shows: 25, 50 or 100
 
 
 def default_config_path() -> Path:
@@ -44,6 +46,8 @@ def _valid(name: str, value: Any) -> bool:
         return isinstance(value, str) and is_valid_wiki(value)
     if name == "min_bytes":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+    if name == "reading_rows":
+        return value in READING_ROW_STEPS
     if name in ("hide_bots", "articles_only"):
         return isinstance(value, bool)
     if name == "contact":  # it goes into a request header, so no control characters and nothing outside ASCII

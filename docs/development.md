@@ -92,7 +92,8 @@ src/wikihose/
   titles.py     title normalization, article URL parsing, host_for_wiki (enwiki to en.wikipedia.org), and page_url and
                 diff_url, the addresses Enter opens
   messages.py   plain-words text for a FetchError
-  store.py      SQLite storage with versioned migrations (schema version 2: the watchlist columns)
+  store.py      SQLite storage with versioned migrations (schema version 2: the watchlist columns); `history=False`
+                (replay and demo) drops edit minutes and pageviews and keeps the reader's rows
   watchlist_input.py  reading what the user types after w: a title or a pasted article URL
   watchlist.py  the Watchlist service: add by page ID, in-memory match by (wiki, title), moves, unseen counts, and
                 subscribe/in/len for the tabs that redraw when it changes
@@ -166,7 +167,8 @@ commit). It sends the bytes a terminal sends, keys and SGR mouse reports with po
 asserts on the rendered screen; a failed wait fails with a dump of the screen. The journeys run at 80x24 and 120x30:
 start on the Live tab, keys `1` to `5`, clicking each tab label, clicking `Help` in the footer, `?` and Escape, `b` and
 `a`, the replay keys (`+`, space), Enter with `SSH_CONNECTION` set (no browser opens; the notice shows the page's
-address), the too-small cover at 70x20 and back, and `q` exiting with code 0 and leaving no
+address), the too-small cover at 70x20 and back, a restart (watch a page with `w`, press `b`, quit, start again with the same
+directories and find both), and `q` exiting with code 0 and leaving no
 process. The tests are marked `uat`, so the default run leaves them out; `tests/uat_kit/test_kit.py` (the kit's own
 test, against a tiny echo program) is in the default run and skips itself when tui-test is missing (psutil, which it
 also needs, is a dev dependency).

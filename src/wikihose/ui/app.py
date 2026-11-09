@@ -9,7 +9,7 @@ memory, no requests), runs the startup catch-up in a worker and keeps the Watchl
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
@@ -20,6 +20,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.content import Content
 from textual.screen import Screen
+from textual.theme import Theme
 from textual.widgets import Footer, Static, TabbedContent, TabPane
 from textual.widgets._tabs import Tab
 
@@ -93,7 +94,7 @@ class MainScreen(Screen[None]):
             with TabPane("Live", id="live"):
                 yield LiveTab(shell.config, shell.clock, shell.tz, shell.store, shell.watchlist, shell.subscribe)
             with TabPane("Reading", id="reading"):
-                yield ReadingTab(shell.reading, shell.wiki)
+                yield ReadingTab(shell.reading, shell.wiki, shell.config.reading_rows)
             with TabPane("Watchlist", id="watchlist"):
                 yield WatchlistTab(shell.watchlist, shell.tz, shell.last_editor, shell.trends)
             with TabPane("Diff", id="diff"):
@@ -227,12 +228,11 @@ class WikihoseApp(App[None]):
         *,
         clock: Clock,
         tz: tzinfo | None = None,
-        store: Store | None = None,
+        store: Store,
         config_path: Path | None = None,
         client: Client | None = None,
         reading: Factory | None = None,
         loop_replay: bool = False,
-        saved_watchlist: Sequence[WatchedPage] = (),
     ) -> None:
         super().__init__()
         self.source = source
@@ -243,25 +243,9 @@ class WikihoseApp(App[None]):
         self.reading: Factory = reading or (lambda _wiki: None)  # wiki -> Reading data; None in a replay
         self.config_path = config_path  # None: never write the config (--no-config)
         self.wiki = config.wiki
-        self.client = client  # None in a replay: no network, so nothing to add and no catch-up
-        # Without a database (a replay) the watchlist lives in memory for this run only.
-        # A replay still matches live edits against the reader's saved list: it gets a read-only copy of the rows.
-        self._scratch: Store | None = None
-        backing = store
-        if backing is None:
-            backing = self._scratch = Store(":memory:")
-            for saved in saved_watchlist:
-                backing.add_watch(saved.wiki, saved.page_id, saved.title, saved.added_at, saved.seen_rev_id)
-                backing.set_watch_state(
-                    saved.wiki,
-                    saved.page_id,
-                    unseen=saved.unseen,
-                    last_rev_id=saved.last_rev_id,
-                    last_edit_at=saved.last_edit_at,
-                    deleted=saved.deleted,
-                )
-        self.watchlist = Watchlist(backing, client, clock)
-        self.trends = Trends(backing, client, clock)
+        self.client = client  # None in a replay: no network, so no catch-up and no lookup of a page ID
+        self.watchlist = Watchlist(store, client, clock)
+        self.trends = Trends(store, client, clock)
         self._editors: dict[tuple[str, int], str] = {}  # last editor seen this run, by (wiki, page ID)
         self._badge_queued = False
         self._tab = "live"
@@ -273,6 +257,7 @@ class WikihoseApp(App[None]):
         for theme in THEMES:
             self.register_theme(theme)
         self.theme = config.theme if config.theme in self.available_themes else THEMES[0].name
+        self._theme_in_use = self.theme
         self.watchlist.subscribe(self._watchlist_changed)
 
     # --- screens and data flow ---------------------------------------------------------------------------------------
@@ -292,10 +277,16 @@ class WikihoseApp(App[None]):
     def start_stream(self) -> None:
         self.run_worker(self._pump(), name="stream", group="stream", exclusive=True)
 
+    def on_mount(self) -> None:
+        self.theme_changed_signal.subscribe(self, self._theme_picked)
+
+    def _theme_picked(self, theme: Theme) -> None:
+        if theme.name != self._theme_in_use:  # the signal also fires for the theme the app started with
+            self._theme_in_use = theme.name
+            self.update_config(theme=theme.name)
+
     async def on_unmount(self) -> None:
         await self.source.aclose()
-        if self._scratch is not None:
-            self._scratch.close()
 
     def subscribe(self, callback: Callable[[StreamItem], None]) -> None:
         """Tabs call this to receive every item of the stream, in order, on the app's own event loop."""
@@ -323,7 +314,7 @@ class WikihoseApp(App[None]):
             return
         if isinstance(item, Edit):
             self._watch_edit(item)
-        elif isinstance(item, PageMove):
+        elif isinstance(item, PageMove) and not self.replaying:  # a recorded move must not rename the reader's page
             self._watch_move(item)
         for callback in list(self._subscribers):
             callback(item)
@@ -398,6 +389,7 @@ class WikihoseApp(App[None]):
         what = f"{total} watched page" + ("" if total == 1 else "s")
         self._on_main(self._main.set_note, f"Checking {what}…")
         try:
+            await self.watchlist.resolve_placeholders()
             result = await catch_up(
                 self.watchlist,
                 client,
@@ -560,6 +552,9 @@ class WikihoseApp(App[None]):
         self.update_config(
             hide_bots=message.hide_bots, articles_only=message.articles_only, min_bytes=message.min_bytes
         )
+
+    def on_reading_tab_rows_changed(self, message: ReadingTab.RowsChanged) -> None:
+        self.update_config(reading_rows=message.rows)
 
     def on_live_tab_wiki_changed(self, message: LiveTab.WikiChanged) -> None:
         self.wiki = message.wiki

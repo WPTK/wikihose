@@ -71,7 +71,10 @@ live" with the state (paused, a speed, or replay finished). Keys, shown only in 
 `wikihose --demo` plays `src/wikihose/data/demo-enwiki.jsonl.gz`, which ships in the wheel: six minutes of the real
 English Wikipedia (`enwiki`) stream, recorded on 7 November 2026 (about 00:59 to 01:05 UTC on 8 November), 1,822 events.
 It runs at 1x through `ReplaySource` and never touches the network: no HTTP client and no live source are built. It
-uses your theme but always watches `enwiki`, and it never writes the config file or the database. The top bar says
+uses your theme but always watches `enwiki` (the one setting it does not save). What you do is saved as in live mode,
+the watchlist and the settings, but nothing the recording holds is: no edits or counts reach the database. Pressing `w`
+there needs no connection; the page is kept under a placeholder ID that the next live start replaces with the real one.
+The top bar says
 "Recorded data, not live". When the recording ends it starts again from the top with an empty log and fresh numbers, so
 a demo left open keeps moving (a `--replay FILE` run stops at "replay finished" instead). `--demo` cannot be combined
 with `--replay`, `--record`, `--wiki` or `--speed`; the replay keys (space, `+`, `-`, `]`) work as in any replay.

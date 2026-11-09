@@ -174,6 +174,5 @@ def test_a_replay_plays_in_the_wiki_its_recording_holds(
     import wikihose.ui.app
 
     monkeypatch.setattr(wikihose.ui.app, "WikihoseApp", FakeApp)
-    monkeypatch.setattr("wikihose.cli._saved_watchlist", lambda: [])
     assert main(["--replay", str(path), "--no-config", *args]) == 0
     assert seen["wiki"] == expected

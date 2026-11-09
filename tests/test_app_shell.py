@@ -508,14 +508,14 @@ async def test_a_missing_page_is_explained(clock: VirtualClock, client: Client) 
         assert len(app.watchlist) == 0
 
 
-async def test_without_a_connection_adding_says_so(clock: VirtualClock) -> None:
+async def test_without_a_connection_adding_still_watches_the_page(clock: VirtualClock) -> None:
     app = app_with(clock, make_edit("Ada Lovelace"))  # no client, as in a replay
     async with app.run_test(size=(100, 30)) as pilot:
         await settle(app, pilot)
         await pilot.press("w")
         await finish_work(app, pilot)
-        assert "needs a connection to Wikipedia" in next(n.message for n in app._notifications)
-        assert len(app.watchlist) == 0
+        assert "Watching Ada Lovelace" in next(n.message for n in app._notifications)
+        assert len(app.watchlist) == 1
 
 
 async def test_the_dialog_cancels_with_escape_and_with_the_button(clock: VirtualClock) -> None:
@@ -626,9 +626,9 @@ async def test_the_configured_theme_is_used(clock: VirtualClock) -> None:
 
 
 async def test_the_local_zone_defaults_to_the_machines(clock: VirtualClock) -> None:
-    app = WikihoseApp(ListSource(clock), Config(), clock=clock)
+    app = WikihoseApp(ListSource(clock), Config(), clock=clock, store=Store(":memory:"))
     assert app.tz is not None
-    explicit = WikihoseApp(ListSource(clock), Config(), clock=clock, tz=EASTERN)
+    explicit = WikihoseApp(ListSource(clock), Config(), clock=clock, tz=EASTERN, store=Store(":memory:"))
     assert explicit.tz is EASTERN
 
 
@@ -724,7 +724,8 @@ async def test_the_footer_fits_80_columns_with_rows_on_every_tab(clock: VirtualC
             app = make_app(ListSource(clock, [make_edit(f"Page {n}") for n in range(3)]), clock, store=store)
         else:
             source = ReplaySource(path, clock)
-            app = make_app(source, clock, loop_replay=mode == "demo", saved_watchlist=[page])
+            store.add_watch(page.wiki, page.page_id, page.title, page.added_at, page.seen_rev_id)
+            app = make_app(source, clock, loop_replay=mode == "demo", store=store)
         async with app.run_test(size=(80, 24)) as pilot:
             await pilot.pause()
             app.query_one(DiffTab).show(request)
