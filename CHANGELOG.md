@@ -22,6 +22,12 @@ entry. Versions follow [ZeroVer](https://0ver.org).
 
 - 🔥 Remove the `b` alias for going back from the Diff tab; Escape goes back (#38)
 
+### Fixed
+
+- 🐛 Save the watchlist and the settings in `--demo` and `--replay` as in live mode, without storing the recording's edits (#39)
+- 🐛 Let `w` watch a page in `--demo` and `--replay` with no connection, under a placeholder ID the next live start replaces (#39)
+- 🐛 Save a theme picked from the command palette, and the Reading tab's row count (#39)
+
 ## [0.1.0] - 2026-11-08
 
 _Known issue: the Live log can show rows slightly out of time order, as the feed sends them (#27)._

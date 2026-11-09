@@ -34,7 +34,7 @@ def sample_app(theme: str) -> WikihoseApp:
         header, _ = read_recording(path)
         clock = VirtualClock(header.recorded_at)
         source = ReplaySource(path, clock)
-    return WikihoseApp(source, Config(theme=theme), clock=clock, tz=EASTERN)
+    return WikihoseApp(source, Config(theme=theme), clock=clock, tz=EASTERN, store=Store(":memory:"))
 
 
 async def to_the_end(pilot: Any) -> None:

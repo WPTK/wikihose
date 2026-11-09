@@ -87,6 +87,10 @@ wikihose --selftest    # checks the install without the network
 
 `wikihose --help` lists the rest (`--replay`, `--record`). `q` quits.
 
+Your watchlist and settings are saved in every mode, the demo included. Pages you watch in the demo are kept without a
+connection and are matched with their real Wikipedia page the next time you run wikihose live. `--no-config` stops the
+settings from being written.
+
 wikihose is an unofficial project. It is not affiliated with, endorsed by, or sponsored by the Wikimedia Foundation.
 Wikipedia is a trademark of the Wikimedia Foundation. It reads public Wikimedia feeds and APIs and keeps well inside
 their rate limits.

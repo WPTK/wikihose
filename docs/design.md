@@ -68,6 +68,12 @@ that follow one editor across edits.
 `--demo` (a bundled recording that works with no network), `--record <file>`, `--replay <file>` (pause, speed and skip
 keys), `--offline` (saved data only), `--version`, `--selftest`, `--diagnose`, `--debug`, `--no-config`.
 
+What the reader does is saved in every mode: the watchlist (add, remove, mark seen) and the settings (theme, filters, the
+Reading row count). Recorded data is never saved: a replay or `--demo` writes no edit minutes and no pageview history to
+the database, because a recording holds old edits. The one setting a mode does not save is the wiki in the demo, which is
+always `enwiki`. `--no-config` still means the config file is never written. With no connection a page is watched under a
+placeholder ID, and the next live start looks up the real one.
+
 ## Architecture
 
 - One shared network client handles the User-Agent, gzip, timeouts, the request budget, `stamina` retries and the

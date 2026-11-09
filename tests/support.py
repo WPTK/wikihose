@@ -14,6 +14,7 @@ from payloads import action_page, action_response
 from wikihose.clock import Clock
 from wikihose.config import Config
 from wikihose.sources.events import Edit, StreamItem
+from wikihose.store import Store
 from wikihose.ui.app import WikihoseApp
 from wikihose.ui.tabs.live import LiveTab
 
@@ -75,6 +76,7 @@ class ListSource:
 
 def make_app(source: Any, clock: Clock, **kwargs: Any) -> WikihoseApp:
     config = kwargs.pop("config", Config())
+    kwargs.setdefault("store", Store(":memory:"))
     return WikihoseApp(source, config, clock=clock, tz=EASTERN, **kwargs)
 
 

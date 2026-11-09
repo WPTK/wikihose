@@ -15,11 +15,11 @@ from textual.message import Message
 from textual.timer import Timer
 from textual.widgets import DataTable, Static
 
+from wikihose.config import READING_ROW_STEPS
 from wikihose.net import FetchError
 from wikihose.reading import MIN_VIEWS, ReadingSource, SpikeRow, Summary
 from wikihose.ui.widgets import PageTable, spark
 
-ROW_STEPS = (25, 50, 100)  # the first is the default (owner's choice)
 VIEWS_WIDTH = 10
 USUAL_WIDTH = 9
 SPIKE_WIDTH = 10
@@ -76,14 +76,21 @@ class ReadingTab(Vertical):
             self.rows = rows
             self.error = error
 
-    def __init__(self, factory: Factory, wiki: str) -> None:
+    class RowsChanged(Message):
+        """The reader picked another row count; the shell saves it to the config file."""
+
+        def __init__(self, rows: int) -> None:
+            super().__init__()
+            self.rows = rows
+
+    def __init__(self, factory: Factory, wiki: str, rows: int = READING_ROW_STEPS[0]) -> None:
         super().__init__(id="reading-tab")
         self._factory = factory
         self.wiki = wiki
         self._source: ReadingSource | None = factory(wiki)
         self._rows: list[SpikeRow] = []
         self._by_title: dict[str, SpikeRow] = {}
-        self._limit = ROW_STEPS[0]
+        self._limit = rows
         self._started = False
         self._message = ""  # a loading, error or replay message; empty means show the usual one-line description
         self._summaries: dict[str, Summary | None] = {}
@@ -172,8 +179,10 @@ class ReadingTab(Vertical):
         self.load()
 
     def action_more_rows(self) -> None:
-        self._limit = ROW_STEPS[(ROW_STEPS.index(self._limit) + 1) % len(ROW_STEPS)]
+        steps = READING_ROW_STEPS
+        self._limit = steps[(steps.index(self._limit) + 1) % len(steps)]
         self._draw()
+        self.post_message(self.RowsChanged(self._limit))
 
     # --- the table ---------------------------------------------------------------------------------------------------
 

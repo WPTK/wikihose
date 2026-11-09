@@ -25,7 +25,7 @@ from wikihose.messages import describe_fetch_error
 from wikihose.net import Client, FetchError
 from wikihose.store import WatchedPage
 from wikihose.titles import host_for_wiki
-from wikihose.watchlist import Watchlist, api_url
+from wikihose.watchlist import Watchlist, api_url, is_placeholder
 
 LOOKBACK = timedelta(days=30)
 INFO_BATCH = 50  # page IDs per request (the limit for ordinary users)
@@ -67,7 +67,7 @@ async def catch_up(
 ) -> CatchUpResult:
     """Check every watched page, update the watchlist and return what was found."""
     result = CatchUpResult()
-    pages = watchlist.pages()
+    pages = [page for page in watchlist.pages() if not is_placeholder(page)]  # a made-up ID cannot be asked about
     done = 0
     if progress:
         progress(done, len(pages))

@@ -7,7 +7,6 @@ features that use them: edit minutes and the watchlist so far.
 
 from __future__ import annotations
 
-import logging
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
@@ -47,7 +46,6 @@ SCHEMA_V2 = [
 ]
 
 MIGRATIONS: list[list[str]] = [SCHEMA_V1, SCHEMA_V2]
-log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = len(MIGRATIONS)
 
@@ -70,28 +68,6 @@ class WatchedPage:
     deleted: bool  # the wiki no longer has the page
 
 
-def read_saved_watchlist(path: Path) -> list[WatchedPage]:
-    """The watched pages in the database at ``path``, read without writing: no migration and no
-    journal or lock files. It opens the file as an immutable snapshot, so a wikihose writing at that moment can be read
-    half-way, which only costs an empty list.
-
-    A replay uses this to match live edits against the reader's list. Anything wrong with the file (missing, corrupt,
-    written by a newer wikihose, or an older schema without the watchlist columns) gives an empty list.
-    """
-    try:
-        db = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro&immutable=1", uri=True)
-    except (sqlite3.Error, OSError, ValueError):
-        return []
-    try:
-        rows = db.execute(f"SELECT {_WATCH_COLUMNS} {_WATCH_FROM} ORDER BY w.added_at, w.wiki, w.page_id")
-        return [_watched(row) for row in rows]
-    except (sqlite3.Error, ValueError, TypeError):
-        log.warning("could not read the saved watchlist from %s", path, exc_info=True)
-        return []
-    finally:
-        db.close()
-
-
 def _watched(row: tuple[Any, ...]) -> WatchedPage:
     return WatchedPage(
         wiki=row[0],
@@ -107,7 +83,11 @@ def _watched(row: tuple[Any, ...]) -> WatchedPage:
 
 
 class Store:
-    def __init__(self, path: Path | str) -> None:
+    """The database. ``history=False`` is for a replay or the demo: the reader's own rows (the watchlist) are written as
+    usual, but recorded data (edit minutes, pageviews) is never stored, since a recording holds old edits."""
+
+    def __init__(self, path: Path | str, *, history: bool = True) -> None:
+        self._history = history
         if isinstance(path, Path):
             path.parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(path, isolation_level=None)  # autocommit; transactions are explicit
@@ -149,6 +129,8 @@ class Store:
         bytes_removed: int = 0,
     ) -> None:
         """Add to the counters for one page in one UTC minute (an ISO minute such as 2026-11-07T14:05)."""
+        if not self._history:
+            return
         with self._transaction():
             self._db.execute(
                 "INSERT INTO edit_minutes (wiki, page, minute, edits, human_edits, bytes_added, bytes_removed) "
@@ -183,6 +165,8 @@ class Store:
         return dict(rows)
 
     def save_pageviews(self, wiki: str, page: str, days: dict[str, int]) -> None:
+        if not self._history:
+            return
         with self._transaction():
             self._db.executemany(
                 "INSERT OR REPLACE INTO pageviews (wiki, page, day, views) VALUES (?, ?, ?, ?)",

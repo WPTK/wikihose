@@ -535,34 +535,36 @@ async def test_a_failed_catch_up_says_so_without_crashing(clock: VirtualClock, s
 
 
 @respx.mock
+@respx.mock
 async def test_a_replay_matches_live_edits_against_the_saved_watchlist_without_catching_up(
     clock: VirtualClock, store: Store, client: Client
 ) -> None:
-    """As the command line builds it: no store, and a copy of the saved rows."""
+    """As the command line builds it: the real store, history off, and the reader's saved rows in it."""
     store.add_watch("enwiki", 4242, "David Webb (filmmaker)", clock.now(), 1)
-    saved = store.watched_pages()
     with sample_recording() as path:
-        app = make_app(ReplaySource(path, clock), clock, store=None, client=client, saved_watchlist=saved)
+        app = make_app(ReplaySource(path, clock), clock, store=store, client=client)
         async with app.run_test(size=SIZE) as pilot:
             await wait_for_stream(app, pilot)
             await finish_work(app, pilot)
             assert respx.calls.call_count == 0
             assert badge(app) == "Watchlist 1"  # a real live match
-            assert store.watched_pages()[0].unseen == 0  # the saved list itself is untouched
+            assert store.watched_pages()[0].unseen > 0  # and it is saved: the count is the reader's too
             await pilot.press("3")
             await pilot.pause()
             assert table(app).row_count == 1
 
 
-async def test_w_in_a_replay_says_it_needs_a_connection(clock: VirtualClock) -> None:
+async def test_w_in_a_replay_watches_the_page_under_a_placeholder_id(clock: VirtualClock, store: Store) -> None:
     with sample_recording() as path:
-        app = make_app(ReplaySource(path, clock), clock, store=None)
+        app = make_app(ReplaySource(path, clock), clock, store=store)
         async with app.run_test(size=SIZE) as pilot:
             await pilot.press("W")
             await pilot.pause()
             await pilot.press(*"Alan Turing", "enter")
             await finish_work(app, pilot)
-            assert any("needs a connection" in n for n in notes(app))
+            assert any("Watching Alan Turing" in n for n in notes(app))
+    [page] = store.watched_pages()
+    assert (page.wiki, page.title) == ("enwiki", "Alan Turing") and page.page_id < 0
 
 
 @respx.mock

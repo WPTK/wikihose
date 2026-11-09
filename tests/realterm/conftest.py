@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Callable, Iterator
+from pathlib import Path
 
 import pytest
 from uat_kit import Terminal, unavailable_reason  # tests/ is on sys.path (rootdir import mode)
@@ -29,10 +30,11 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                 item.add_marker(pytest.mark.skip(reason=f"real-terminal layer unavailable: {REASON}"))
 
 
-def launch(cols: int, rows: int, extra_env: dict[str, str] | None = None) -> Terminal:
+def launch(cols: int, rows: int, extra_env: dict[str, str] | None = None, home: Path | None = None) -> Terminal:
     exe = os.environ.get(EXE_ENV)
     argv = [exe, "--demo"] if exe else [sys.executable, "-m", "wikihose", "--demo"]
-    env = {"WIKIHOSE_CONFIG_DIR": "{dir}/config", "WIKIHOSE_DATA_DIR": "{dir}/data", **(extra_env or {})}
+    root = "{dir}" if home is None else str(home)  # a test that restarts the program keeps its files in its own home
+    env = {"WIKIHOSE_CONFIG_DIR": f"{root}/config", "WIKIHOSE_DATA_DIR": f"{root}/data", **(extra_env or {})}
     return Terminal(argv, cols, rows, env=env)
 
 
@@ -45,12 +47,13 @@ def size(request: pytest.FixtureRequest) -> tuple[int, int]:
 def start(size: tuple[int, int]) -> Iterator[Callable[..., Terminal]]:
     """``start()`` runs the program at the parametrized size and waits until the Live tab is drawn.
 
-    ``start(env={...})`` adds variables to the child's environment.
+    ``start(env={...})`` adds variables to the child's environment. ``start(home=path)`` keeps the config and data
+    directories in ``path``, so a second ``start(home=path)`` sees what the first one saved.
     """
     made: list[Terminal] = []
 
-    def factory(env: dict[str, str] | None = None) -> Terminal:
-        term = launch(*size, extra_env=env)
+    def factory(env: dict[str, str] | None = None, home: Path | None = None) -> Terminal:
+        term = launch(*size, extra_env=env, home=home)
         made.append(term)
         term.wait_for(lambda s: "wikihose" in s and "bots" in s, 45, "the Live tab")
         term.settle()

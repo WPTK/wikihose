@@ -112,7 +112,7 @@ def test_demo_headless_runs_with_no_network(
     assert capsys.readouterr().out.startswith("edits=")
 
 
-def test_demo_forces_enwiki_keeps_the_theme_and_never_writes_the_config(
+def test_demo_forces_enwiki_keeps_the_theme_and_never_saves_the_wiki(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from wikihose.paths import config_dir
@@ -141,8 +141,8 @@ def test_demo_forces_enwiki_keeps_the_theme_and_never_writes_the_config(
     assert isinstance(seen["source"], ReplaySource)
     assert seen["config"].wiki == "enwiki"
     assert seen["config"].theme == "wikihose-light"
-    assert seen["config_path"] is None
-    assert seen["store"] is None
+    assert seen["config_path"] == config_dir() / "config.toml"  # settings are saved in the demo too
+    assert seen["store"] is not None
     assert seen["loop_replay"] is True
     assert path.read_bytes() == before
 

@@ -10,6 +10,7 @@ not newer than the newest one known, so an edit seen live and again in the catch
 
 from __future__ import annotations
 
+import zlib
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -22,7 +23,7 @@ from wikihose.sources.events import Edit
 from wikihose.store import Store, WatchedPage
 from wikihose.titles import host_for_wiki, page_key
 
-__all__ = ["AddResult", "WatchError", "WatchedPage", "Watchlist", "api_url"]
+__all__ = ["AddResult", "WatchError", "WatchedPage", "Watchlist", "api_url", "is_placeholder"]
 
 
 class WatchError(Exception):
@@ -36,6 +37,24 @@ class AddResult:
     already_watched: bool
 
 
+def is_placeholder(page: WatchedPage) -> bool:
+    """A page watched with no connection (a replay or the demo): its ID is made up and negative until the next live
+    start looks the real one up."""
+    return page.page_id < 0
+
+
+def _placeholder_id(wiki: str, title: str) -> int:
+    return -1 - zlib.crc32(f"{wiki}:{title}".encode())
+
+
+@dataclass(frozen=True, slots=True)
+class _Found:
+    title: str
+    page_id: int
+    last_rev_id: int
+    asked: str
+
+
 def api_url(wiki: str) -> str:
     """The Action API endpoint of a wiki. Raises ValueError for a database name wikihose cannot map to a host."""
     host = host_for_wiki(wiki)
@@ -46,7 +65,7 @@ def api_url(wiki: str) -> str:
 
 class Watchlist:
     def __init__(self, store: Store, client: Client | None, clock: Clock) -> None:
-        """``client`` is None when there is no network (a replay): pages can be matched and listed but not added."""
+        """``client`` is None when there is no network (a replay): a page is then added under a placeholder ID."""
         self._store = store
         self._client = client
         self._clock = clock
@@ -95,13 +114,49 @@ class Watchlist:
 
     async def add(self, wiki: str, title: str) -> AddResult:
         """Watch a page. Looks up its page ID, follows a redirect and refuses pages that do not exist or are not
-        articles. A new page starts with nothing unseen."""
+        articles. A new page starts with nothing unseen. With no connection (a replay) the page is watched under a
+        placeholder ID that ``resolve_placeholders`` replaces at the next live start."""
+        if self._client is None:
+            return self._add_offline(wiki, title)
+        found = await self._lookup(self._client, wiki, title)
+        redirected_from = found.asked if found.title != found.asked else None
+        stale = self.match(wiki, found.title)
+        if stale is not None and is_placeholder(stale):
+            self.remove(stale)  # the same page, watched offline before: the real ID takes its place
+        existing = self._pages.get((wiki, found.page_id))
+        if existing is not None:
+            return AddResult(existing, redirected_from, already_watched=True)
+        return AddResult(self._insert(wiki, found, self._clock.now()), redirected_from, already_watched=False)
+
+    def _add_offline(self, wiki: str, title: str) -> AddResult:
+        asked = page_key(wiki, title)[1]
+        existing = self.match(wiki, asked)
+        if existing is not None:
+            return AddResult(existing, None, already_watched=True)
+        found = _Found(asked, _placeholder_id(wiki, asked), 0, asked)
+        return AddResult(self._insert(wiki, found, self._clock.now()), None, already_watched=False)
+
+    async def resolve_placeholders(self) -> None:
+        """Look up the real page ID of every page watched offline and move it there. A page the wiki does not answer
+        for stays as it is and is tried again at the next start."""
+        if self._client is None:
+            return
+        for page in [page for page in self.pages() if is_placeholder(page)]:
+            try:
+                found = await self._lookup(self._client, page.wiki, page.title)
+            except WatchError:
+                continue
+            if (current := self.current(page)) is None:
+                continue  # removed while the lookup ran
+            self.remove(current)
+            if (page.wiki, found.page_id) not in self._pages:
+                self._insert(page.wiki, found, page.added_at)
+
+    async def _lookup(self, client: Client, wiki: str, title: str) -> _Found:
         try:
             url = api_url(wiki)
         except ValueError:
             raise WatchError(f"wikihose cannot watch pages on {wiki} yet.") from None
-        if self._client is None:
-            raise WatchError("Adding a page needs a connection to Wikipedia, and this session has none.")
         asked = page_key(wiki, title)[1]
         params = {
             "action": "query",
@@ -112,7 +167,7 @@ class Watchlist:
             "formatversion": "2",
         }
         try:
-            data = await self._client.get_json(url, params)
+            data = await client.get_json(url, params)
         except FetchError as exc:
             raise WatchError(describe_fetch_error(exc)) from exc
         found = _first_page(data)
@@ -123,16 +178,13 @@ class Watchlist:
         real = str(found["title"])
         if found.get("ns") != 0:
             raise WatchError(f"“{real}” is not an article. wikihose watches articles only.")
-        page_id = int(found["pageid"])
-        redirected_from = asked if real != asked else None
-        existing = self._pages.get((wiki, page_id))
-        if existing is not None:
-            return AddResult(existing, redirected_from, already_watched=True)
-        self._store.add_watch(wiki, page_id, real, self._clock.now(), int(found.get("lastrevid", 0)))
-        page = self._store.watched_page(wiki, page_id)
+        return _Found(real, int(found["pageid"]), int(found.get("lastrevid", 0)), asked)
+
+    def _insert(self, wiki: str, found: _Found, added_at: datetime) -> WatchedPage:
+        self._store.add_watch(wiki, found.page_id, found.title, added_at, found.last_rev_id)
+        page = self._store.watched_page(wiki, found.page_id)
         assert page is not None
-        self._put(page)
-        return AddResult(page, redirected_from, already_watched=False)
+        return self._put(page)
 
     def remove(self, page: WatchedPage) -> bool:
         """Stop watching. False when the page was not on the list."""
