@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import sqlite3
 import sys
 from collections.abc import Sequence
 from contextlib import ExitStack
@@ -173,7 +174,15 @@ async def _run(args: argparse.Namespace, config: Config, config_path: Path | Non
         from wikihose.ui.app import WikihoseApp
 
         # The reader's watchlist is saved in every mode; a recording's edits and counts never reach the database.
-        store = Store(db_path(), history=not (args.replay is not None or args.demo))
+        try:
+            store = Store(db_path(), history=not (args.replay is not None or args.demo))
+        except (
+            OSError,
+            sqlite3.Error,
+            RuntimeError,
+        ) as exc:  # unwritable folder, corrupt or newer file
+            print(f"wikihose: cannot open the database at {db_path()} ({exc})", file=sys.stderr)
+            return 1
         try:
             app = WikihoseApp(
                 source,

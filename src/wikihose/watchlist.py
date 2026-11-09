@@ -10,7 +10,6 @@ not newer than the newest one known, so an edit seen live and again in the catch
 
 from __future__ import annotations
 
-import zlib
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -41,10 +40,6 @@ def is_placeholder(page: WatchedPage) -> bool:
     """A page watched with no connection (a replay or the demo): its ID is made up and negative until the next live
     start looks the real one up."""
     return page.page_id < 0
-
-
-def _placeholder_id(wiki: str, title: str) -> int:
-    return -1 - zlib.crc32(f"{wiki}:{title}".encode())
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,20 +115,26 @@ class Watchlist:
             return self._add_offline(wiki, title)
         found = await self._lookup(self._client, wiki, title)
         redirected_from = found.asked if found.title != found.asked else None
-        stale = self.match(wiki, found.title)
-        if stale is not None and is_placeholder(stale):
-            self.remove(stale)  # the same page, watched offline before: the real ID takes its place
+        for name in (found.title, found.asked):
+            stale = self.match(wiki, name)
+            if stale is not None and is_placeholder(stale):
+                self.remove(stale)  # the same page, watched offline before: the real ID takes its place
         existing = self._pages.get((wiki, found.page_id))
         if existing is not None:
             return AddResult(existing, redirected_from, already_watched=True)
         return AddResult(self._insert(wiki, found, self._clock.now()), redirected_from, already_watched=False)
 
     def _add_offline(self, wiki: str, title: str) -> AddResult:
+        try:
+            api_url(wiki)  # a wiki wikihose cannot map to a host could never be resolved later
+        except ValueError:
+            raise WatchError(f"wikihose cannot watch pages on {wiki} yet.") from None
         asked = page_key(wiki, title)[1]
         existing = self.match(wiki, asked)
         if existing is not None:
             return AddResult(existing, None, already_watched=True)
-        found = _Found(asked, _placeholder_id(wiki, asked), 0, asked)
+        # The next free negative ID. Not a hash of the title: a move event renames a page and keeps its ID.
+        found = _Found(asked, min([0, *(page.page_id for page in self._pages.values())]) - 1, 0, asked)
         return AddResult(self._insert(wiki, found, self._clock.now()), None, already_watched=False)
 
     async def resolve_placeholders(self) -> None:

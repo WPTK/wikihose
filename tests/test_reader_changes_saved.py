@@ -215,3 +215,15 @@ async def test_an_offline_edit_to_a_placeholder_page_counts_as_unseen(clock: Vir
     assert watchlist.record_edit(make_edit("Ada Lovelace", rev_new=7)) is not None
     assert watchlist.unseen_total() == 1
     store.close()
+
+
+async def test_two_offline_pages_never_share_an_id_even_after_a_move(clock: VirtualClock, tmp_path: Path) -> None:
+    store = Store(tmp_path / "wikihose.db")
+    watchlist = Watchlist(store, None, clock)
+    await watchlist.add("enwiki", "Foo")
+    watchlist.apply_move("enwiki", "Foo", "Bar")
+    result = await watchlist.add("enwiki", "Foo")
+    assert not result.already_watched
+    assert sorted(p.title for p in watchlist.pages()) == ["Bar", "Foo"]
+    assert len({p.page_id for p in watchlist.pages()}) == 2
+    store.close()

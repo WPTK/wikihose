@@ -314,7 +314,7 @@ class WikihoseApp(App[None]):
             return
         if isinstance(item, Edit):
             self._watch_edit(item)
-        elif isinstance(item, PageMove):
+        elif isinstance(item, PageMove) and not self.replaying:  # a recorded move must not rename the reader's page
             self._watch_move(item)
         for callback in list(self._subscribers):
             callback(item)
@@ -385,11 +385,11 @@ class WikihoseApp(App[None]):
         self.run_worker(self._catch_up(self.client), name="catch-up", group="catch-up", exclusive=True)
 
     async def _catch_up(self, client: Client) -> None:
-        await self.watchlist.resolve_placeholders()
         total = len(self.watchlist)
         what = f"{total} watched page" + ("" if total == 1 else "s")
         self._on_main(self._main.set_note, f"Checking {what}…")
         try:
+            await self.watchlist.resolve_placeholders()
             result = await catch_up(
                 self.watchlist,
                 client,

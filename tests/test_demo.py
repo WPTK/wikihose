@@ -142,7 +142,7 @@ def test_demo_forces_enwiki_keeps_the_theme_and_never_saves_the_wiki(
     assert seen["config"].wiki == "enwiki"
     assert seen["config"].theme == "wikihose-light"
     assert seen["config_path"] == config_dir() / "config.toml"  # settings are saved in the demo too
-    assert seen["store"] is not None
+    assert seen["store"]._history is False  # recorded data stays out of the database
     assert seen["loop_replay"] is True
     assert path.read_bytes() == before
 
